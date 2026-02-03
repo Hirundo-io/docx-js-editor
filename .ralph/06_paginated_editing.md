@@ -120,8 +120,8 @@ WYSIWYG Editor is licensed under **AGPL-3.0**. We use it ONLY to understand conc
 
 ### Task 1.5: Handle keepNext/keepLines
 
-- [ ] Add keepNext chain detection to layout engine
-- [ ] If chain doesn't fit, move entire chain to next page
+- [x] Add keepNext chain detection to layout engine
+- [x] If chain doesn't fit, move entire chain to next page
 
 **WYSIWYG Editor reference (concept only):**
 
