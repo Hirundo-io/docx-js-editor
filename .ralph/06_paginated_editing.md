@@ -392,9 +392,9 @@ WYSIWYG Editor is licensed under **AGPL-3.0**. We use it ONLY to understand conc
 
 ### Task 8.1: Measure header/footer content
 
-- [ ] Create `src/layout-bridge/measureHeaderFooter.ts`
-- [ ] Measure actual height of header/footer content
-- [ ] Pass heights to layout engine
+- [x] Create `src/layout-bridge/measureHeaderFooter.ts`
+- [x] Measure actual height of header/footer content
+- [x] Pass heights to layout engine
 
 **WYSIWYG Editor reference (concept only):**
 
