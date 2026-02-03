@@ -85,9 +85,9 @@ WYSIWYG Editor is licensed under **AGPL-3.0**. We use it ONLY to understand conc
 
 ### Task 1.3: Create layoutDocument function
 
-- [ ] Create `src/layout-engine/index.ts` with main `layoutDocument()`
-- [ ] Input: blocks + measures + options → Output: Layout with pages
-- [ ] Walk blocks in order, position fragments on pages
+- [x] Create `src/layout-engine/index.ts` with main `layoutDocument()`
+- [x] Input: blocks + measures + options → Output: Layout with pages
+- [x] Walk blocks in order, position fragments on pages
 
 **WYSIWYG Editor reference (concept only):**
 
