@@ -347,9 +347,9 @@ WYSIWYG Editor is licensed under **AGPL-3.0**. We use it ONLY to understand conc
 
 ### Task 7.1: Create hidden PM host
 
-- [ ] Create `src/paged-editor/HiddenProseMirror.tsx`
-- [ ] Invisible ProseMirror that receives focus/input
-- [ ] Forward transactions to layout pipeline
+- [x] Create `src/paged-editor/HiddenProseMirror.tsx`
+- [x] Invisible ProseMirror that receives focus/input
+- [x] Forward transactions to layout pipeline
 
 **WYSIWYG Editor reference (concept only):**
 
