@@ -442,9 +442,9 @@ WYSIWYG Editor is licensed under **AGPL-3.0**. We use it ONLY to understand conc
 
 ### Task 9.1: Create integration tests
 
-- [ ] Test: layout produces correct pages
-- [ ] Test: click maps to correct PM position
-- [ ] Test: PM edits update visual pages
+- [x] Test: layout produces correct pages
+- [x] Test: click maps to correct PM position
+- [x] Test: PM edits update visual pages
 
 ### Task 9.2: Performance baseline
 
