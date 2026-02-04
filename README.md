@@ -6,6 +6,49 @@ An open-source, extendable WYSIWYG DOCX editor for JavaScript.
 
 <!-- Add video here -->
 
+## Installation
+
+```bash
+npm install @eigenpal/docx-js-editor
+```
+
+## Usage
+
+```tsx
+import DocxEditor from '@eigenpal/docx-js-editor';
+import '@eigenpal/docx-js-editor/styles.css';
+
+function App() {
+  const handleChange = (document) => {
+    console.log('Document changed:', document);
+  };
+
+  return <DocxEditor onChange={handleChange} />;
+}
+```
+
+### Load a DOCX file
+
+```tsx
+import { parseDocx } from '@eigenpal/docx-js-editor';
+
+const file = await fetch('/template.docx').then((r) => r.arrayBuffer());
+const document = await parseDocx(file);
+
+<DocxEditor initialDocument={document} />;
+```
+
+### Template variables
+
+```tsx
+import { processTemplate } from '@eigenpal/docx-js-editor';
+
+const result = await processTemplate(docxBuffer, {
+  name: 'John Doe',
+  company: 'Acme Inc',
+});
+```
+
 ## Features
 
 - Full WYSIWYG editing with Microsoft Word fidelity
@@ -14,13 +57,7 @@ An open-source, extendable WYSIWYG DOCX editor for JavaScript.
 - Extendable plugin architecture
 - Zero server dependencies — runs entirely client-side
 
-## Installation
-
-```bash
-npm install @eigenpal/docx-js-editor
-```
-
-## Quick Start
+## Development
 
 ```bash
 bun install
