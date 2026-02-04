@@ -20,8 +20,7 @@ The ProseMirror editor is functional with basic formatting (bold, italic, underl
 
 ## Reference
 
-- **WYSIWYG Editor style engine**: `reference/wysiwyg-editor/packages/layout-engine/style-engine/`
-- **WYSIWYG Editor table handling**: `reference/wysiwyg-editor/packages/super-editor/src/extensions/`
+- **ECMA-376 spec**: `reference/ecma-376/` for OOXML structure
 - **Our styles parser**: `src/docx/styleParser.ts`
 
 ---
@@ -58,7 +57,7 @@ The ProseMirror editor is functional with basic formatting (bold, italic, underl
 - [x] **Task 5: Add table nodes to schema**
   - Create `table`, `tableRow`, `tableCell` nodes in `nodes.ts`
   - Define proper content models and attributes
-  - Reference: WYSIWYG Editor table nodes
+  - Reference: ECMA-376 table structure
   - **Verify**: `bun run typecheck` passes
 
 - [x] **Task 6: Convert tables in toProseDoc**
@@ -86,7 +85,7 @@ The ProseMirror editor is functional with basic formatting (bold, italic, underl
 
 - [x] **Task 10: Create tab calculation utility**
   - Create `src/prosemirror/utils/tabCalculator.ts`
-  - Port logic from WYSIWYG Editor's `tabs.ts` (clean room)
+  - Implement tab stop calculation per ECMA-376 spec
   - Compute tab width based on position and tab stops
   - **Verify**: Unit test for tab width calculation
 
@@ -192,4 +191,4 @@ bun test src/prosemirror/utils/tabCalculator.test.ts
 - Focus on **visual correctness** over perfect OOXML fidelity
 - Tables can be read-only initially if editing is complex
 - Tab layout can use simplified calculation (not full OOXML spec)
-- Check WYSIWYG Editor for concepts, but write clean-room implementations
+- Reference ECMA-376 spec for OOXML concepts

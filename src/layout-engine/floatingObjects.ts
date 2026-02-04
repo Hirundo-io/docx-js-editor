@@ -2,8 +2,8 @@
  * Floating Object Manager
  *
  * Manages floating/anchored images and computes exclusion zones for text wrapping.
- * Based on WYSIWYG Editor's approach: floating images create exclusion zones that reduce
- * available line widths during paragraph layout.
+ * Floating images create exclusion zones that reduce available line widths during
+ * paragraph layout.
  */
 
 export interface ExclusionZone {

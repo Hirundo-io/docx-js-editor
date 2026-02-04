@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document outlines the architecture for implementing **true paginated editing** in docx-editor, inspired by WYSIWYG Editor's approach. The goal is to replace the current continuous ProseMirror editor with a page-based editing experience where users see real pages while editing.
+This document outlines the architecture for implementing **true paginated editing** in docx-editor. The goal is to replace the current continuous ProseMirror editor with a page-based editing experience where users see real pages while editing.
 
 **Estimated scope:** ~30,000-40,000 lines of TypeScript
 **Estimated timeline:** 3-6 months with focused effort
@@ -28,7 +28,7 @@ This document outlines the architecture for implementing **true paginated editin
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Target Architecture (WYSIWYG Editor-style)
+### Target Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐

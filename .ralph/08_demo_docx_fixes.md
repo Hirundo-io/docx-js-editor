@@ -29,7 +29,7 @@
 
 ### Task 2.1: Fix toolbar state not reflecting editor selection
 
-- [ ] Research WYSIWYG Editor selection tracking approach
+- [ ] Research selection tracking approaches for WYSIWYG editors
 - [ ] Check `selectionTracker.ts` plugin for issues
 - [ ] Ensure selection changes emit correct formatting context
 - [ ] Verify toolbar receives and displays current formatting
@@ -91,7 +91,7 @@
 
 ### Task 5.1: Enable table cell selection and editing
 
-- [ ] Research WYSIWYG Editor table editing approach
+- [ ] Research table editing approaches for ProseMirror
 - [ ] Ensure table cells are editable in ProseMirror
 - [ ] Fix cursor navigation within tables (Tab, Shift+Tab)
 - [ ] Enable text input in table cells

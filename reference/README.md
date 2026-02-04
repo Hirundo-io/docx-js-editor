@@ -6,7 +6,6 @@ Reference materials for implementing the DOCX editor.
 
 ```
 reference/
-├── wysiwyg-editor/                     # ⚠️ LOCAL SYMLINK - Primary reference (AGPL-3.0)
 ├── quick-ref/                    # Human-readable quick references
 │   ├── wordprocessingml.md       # Paragraphs, runs, formatting
 │   └── themes-colors.md          # Theme colors, fonts
@@ -20,16 +19,6 @@ reference/
     └── part4/
         └── *.pdf                 # Transitional features
 ```
-
-## Setup: WYSIWYG Editor Symlink (Local Only)
-
-The `wysiwyg-editor/` symlink is gitignored. Each developer must set it up locally:
-
-```bash
-ln -s /path/to/your/wysiwyg-editor reference/wysiwyg-editor
-```
-
-**⚠️ LEGAL WARNING:** WYSIWYG Editor is AGPL-3.0. Read → Close → Write Fresh. See CLAUDE.md.
 
 ## Key Files for DOCX Editing
 

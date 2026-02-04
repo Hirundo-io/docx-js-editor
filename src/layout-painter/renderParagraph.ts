@@ -817,7 +817,7 @@ export function renderParagraphFragment(
     }
   }
 
-  // Track indentation for line-level application (WYSIWYG Editor approach)
+  // Track indentation for line-level application
   // Indentation is applied per-line, not at fragment level
   const indent = block.attrs?.indent;
   let indentLeft = 0;
@@ -925,7 +925,7 @@ export function renderParagraphFragment(
     firstLineIndentPx = indent.firstLine; // Positive because first line is indented right
   }
 
-  // Render each line with per-line floating margin calculation (WYSIWYG Editor approach)
+  // Render each line with per-line floating margin calculation
   let cumulativeLineY = 0; // Track Y position within the fragment
 
   for (let i = 0; i < lines.length; i++) {
@@ -963,7 +963,7 @@ export function renderParagraphFragment(
     // Update cumulative Y for next line
     cumulativeLineY += line.lineHeight;
 
-    // Apply line-level indentation (WYSIWYG Editor approach)
+    // Apply line-level indentation
     // Indentation is applied per-line for correct text wrapping
     const hasHanging = indent?.hanging && indent.hanging > 0;
     const hasFirstLine = indent?.firstLine && indent.firstLine > 0;
