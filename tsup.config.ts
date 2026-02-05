@@ -1,5 +1,7 @@
 import { defineConfig } from 'tsup';
 
+const isProd = process.env.NODE_ENV === 'production';
+
 export default defineConfig([
   // Main builds (without shebang)
   {
@@ -11,13 +13,15 @@ export default defineConfig([
     },
     format: ['cjs', 'esm'],
     dts: true,
-    splitting: false,
-    sourcemap: true,
+    splitting: true, // Enable code splitting for tree-shaking
+    sourcemap: !isProd, // Disable source maps in production to reduce package size
     clean: true,
+    treeshake: true, // Enable tree-shaking
+    minify: true, // Minify the output
     external: ['react', 'react-dom'],
     injectStyle: false,
   },
-  // CLI build (with shebang)
+  // CLI build (with shebang) - bundles all deps for standalone use
   {
     entry: {
       'mcp-cli': 'src/mcp/cli.ts',
@@ -25,8 +29,10 @@ export default defineConfig([
     format: ['esm'],
     dts: true,
     splitting: false,
-    sourcemap: true,
+    sourcemap: !isProd, // Disable source maps in production
     clean: false, // Don't clean since main build already did
+    treeshake: true,
+    minify: true,
     external: ['react', 'react-dom'],
     injectStyle: false,
     banner: {

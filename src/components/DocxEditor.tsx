@@ -168,7 +168,7 @@ export interface DocxEditorProps {
   rulerUnit?: 'inch' | 'cm';
   /** Initial zoom level (default: 1.0) */
   initialZoom?: number;
-  /** Whether the editor is read-only */
+  /** Whether the editor is read-only. When true, hides toolbar, rulers, and variable panel */
   readOnly?: boolean;
   /** Custom toolbar actions */
   toolbarExtra?: ReactNode;
@@ -1368,7 +1368,8 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
             {/* Editor container - this is the scroll container */}
             <div style={editorContainerStyle}>
               {/* Toolbar - sticky at top of scroll container */}
-              {showToolbar && (
+              {/* Hide toolbar in read-only mode unless explicitly requested */}
+              {showToolbar && !readOnly && (
                 <div className="sticky top-0 z-50 flex flex-col gap-0 bg-white shadow-sm">
                   <Toolbar
                     currentFormatting={state.selectionFormatting}
@@ -1410,8 +1411,8 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
                 </div>
               )}
 
-              {/* Vertical Ruler - fixed on left edge */}
-              {showRuler && (
+              {/* Vertical Ruler - fixed on left edge (hidden in read-only mode) */}
+              {showRuler && !readOnly && (
                 <div
                   style={{
                     position: 'absolute',
@@ -1516,8 +1517,8 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
               </div>
             </div>
 
-            {/* Variable panel */}
-            {showVariablePanel && detectedVariables.length > 0 && (
+            {/* Variable panel (hidden in read-only mode) */}
+            {showVariablePanel && !readOnly && detectedVariables.length > 0 && (
               <div style={variablePanelStyle}>
                 <VariablePanel
                   variables={detectedVariables}
