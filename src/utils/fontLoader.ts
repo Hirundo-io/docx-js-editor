@@ -460,7 +460,7 @@ async function createFontAlias(originalName: string, googleFontName: string): Pr
     style.textContent = aliasedCss;
 
     document.head.appendChild(style);
-    console.log(`Loaded font: "${originalName}" (via ${googleFontName})`);
+    // Font loaded successfully
   } catch (error) {
     console.warn(`Failed to create font alias for "${originalName}":`, error);
   }
@@ -564,6 +564,6 @@ export async function loadDocumentFonts(document: unknown): Promise<void> {
     return;
   }
 
-  console.log('Loading document fonts:', Array.from(fonts));
+  // Loading document fonts
   await loadFontsWithMapping(Array.from(fonts));
 }
