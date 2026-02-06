@@ -215,26 +215,16 @@ export function createTemplatePlugin(): Plugin<TemplatePluginState> {
         if (tr.docChanged) {
           const newTags = findTags(newState.doc);
 
-          // If the tag structure is identical (same IDs in same order),
-          // reuse the old tags array reference. This prevents PluginHost
-          // from triggering React re-renders on every keystroke.
-          if (tagsStructureEqual(value.tags, newTags)) {
-            return {
-              ...value,
-              // Keep old tags reference (positions are stale but overlays
-              // use getRectsForRange which queries the live DOM)
-              decorations: value.decorations.map(tr.mapping, tr.doc),
-            };
-          }
+          // When tag structure is unchanged (same IDs, just shifted positions),
+          // map existing decorations instead of rebuilding from scratch.
+          // Tags still get updated positions for overlay rendering.
+          const structureSame = tagsStructureEqual(value.tags, newTags);
 
           return {
             tags: newTags,
-            decorations: createDecorations(
-              newState.doc,
-              newTags,
-              value.hoveredId,
-              value.selectedId
-            ),
+            decorations: structureSame
+              ? value.decorations.map(tr.mapping, tr.doc)
+              : createDecorations(newState.doc, newTags, value.hoveredId, value.selectedId),
             hoveredId: value.hoveredId,
             selectedId: value.selectedId,
           };

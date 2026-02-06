@@ -36,10 +36,38 @@ import {
   TEMPLATE_DECORATION_STYLES,
 } from './prosemirror-plugin';
 import { AnnotationPanel, ANNOTATION_PANEL_STYLES } from './components/AnnotationPanel';
+import type { AnnotationPanelProps } from './components/AnnotationPanel';
 import {
   TemplateHighlightOverlay,
   TEMPLATE_HIGHLIGHT_OVERLAY_STYLES,
 } from './components/TemplateHighlightOverlay';
+
+/**
+ * Memoized AnnotationPanel that only re-renders when tag structure
+ * or hover/selected state changes — not on every keystroke position shift.
+ */
+const MemoizedAnnotationPanel = React.memo<AnnotationPanelProps>(AnnotationPanel, (prev, next) => {
+  const prevState = prev.pluginState;
+  const nextState = next.pluginState;
+
+  // Re-render if hover/selected changed
+  if (prevState?.hoveredId !== nextState?.hoveredId) return false;
+  if (prevState?.selectedId !== nextState?.selectedId) return false;
+
+  // Re-render if tag structure changed (different count or IDs)
+  const prevTags = prevState?.tags ?? [];
+  const nextTags = nextState?.tags ?? [];
+  if (prevTags.length !== nextTags.length) return false;
+  for (let i = 0; i < prevTags.length; i++) {
+    if (prevTags[i].id !== nextTags[i].id) return false;
+  }
+
+  // Re-render if rendered DOM context changed (initial load)
+  if (prev.renderedDomContext !== next.renderedDomContext) return false;
+
+  // Otherwise skip re-render (positions shifted but structure is the same)
+  return true;
+});
 
 /**
  * Plugin state interface
@@ -70,18 +98,13 @@ export function createPlugin(
   // Create the ProseMirror plugin
   const pmPlugin = createTemplatePlugin();
 
-  // Track previous state to skip unnecessary React re-renders
-  let prevTags: TemplateTag[] = [];
-  let prevHoveredId: string | undefined;
-  let prevSelectedId: string | undefined;
-
   return {
     id: 'template',
     name: 'Template',
 
     proseMirrorPlugins: [pmPlugin],
 
-    Panel: AnnotationPanel,
+    Panel: MemoizedAnnotationPanel,
 
     panelConfig: {
       position: options.panelPosition ?? 'right',
@@ -96,19 +119,6 @@ export function createPlugin(
     onStateChange: (view: EditorView): TemplatePluginState | undefined => {
       const pluginState = templatePluginKey.getState(view.state);
       if (!pluginState) return undefined;
-
-      // Skip update if nothing changed — prevents unnecessary React re-renders
-      if (
-        pluginState.tags === prevTags &&
-        pluginState.hoveredId === prevHoveredId &&
-        pluginState.selectedId === prevSelectedId
-      ) {
-        return undefined;
-      }
-
-      prevTags = pluginState.tags;
-      prevHoveredId = pluginState.hoveredId;
-      prevSelectedId = pluginState.selectedId;
 
       return {
         tags: pluginState.tags,
