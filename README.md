@@ -79,29 +79,25 @@ ref.current.print(); // Print the document
 
 ## Plugins
 
-Extend the editor with the plugin system. Wrap `DocxEditor` in a `PluginHost` and pass an array of plugins:
+Extend the editor with the plugin system. Wrap `DocxEditor` in a `PluginHost` and pass plugins that can contribute ProseMirror plugins, side panels, document overlays, and custom CSS:
 
 ```tsx
-import { DocxEditor, PluginHost, type EditorPlugin } from '@eigenpal/docx-js-editor';
-
-const myPlugin: EditorPlugin = {
-  /* ... */
-};
+import { DocxEditor, PluginHost, templatePlugin } from '@eigenpal/docx-js-editor';
 
 function Editor({ file }: { file: ArrayBuffer }) {
   return (
-    <PluginHost plugins={[myPlugin]}>
+    <PluginHost plugins={[templatePlugin]}>
       <DocxEditor documentBuffer={file} />
     </PluginHost>
   );
 }
 ```
 
-Each plugin can provide custom ProseMirror plugins, toolbar panels, and overlays. See the individual plugin READMEs under [`src/plugins/`](src/plugins/) for usage details.
-
 | Plugin                                 | Description                                                                                  |
 | -------------------------------------- | -------------------------------------------------------------------------------------------- |
 | [Docxtemplater](src/plugins/template/) | Syntax highlighting and annotation panel for [docxtemplater](https://docxtemplater.com) tags |
+
+See [docs/PLUGINS.md](docs/PLUGINS.md) for the full plugin API, including how to create custom plugins with panels, overlays, and ProseMirror integrations.
 
 ## Features
 
