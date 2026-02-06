@@ -67,6 +67,8 @@ export interface HiddenProseMirrorProps {
   onEditorViewReady?: (view: EditorView) => void;
   /** Callback when EditorView is destroyed */
   onEditorViewDestroy?: () => void;
+  /** Intercept key events before ProseMirror processes them. Return true to prevent PM handling. */
+  onKeyDown?: (view: EditorView, event: KeyboardEvent) => boolean;
 }
 
 export interface HiddenProseMirrorRef {
@@ -196,6 +198,7 @@ const HiddenProseMirrorComponent = forwardRef<HiddenProseMirrorRef, HiddenProseM
       externalPlugins = [],
       onEditorViewReady,
       onEditorViewDestroy,
+      onKeyDown,
     } = props;
 
     // Refs
@@ -209,6 +212,21 @@ const HiddenProseMirrorComponent = forwardRef<HiddenProseMirrorRef, HiddenProseM
     // Track if we've initialized - first render needs to set up state
     const isInitializedRef = useRef(false);
 
+    // Store callbacks in refs to avoid dependency array issues that cause infinite loops
+    // when the parent component passes unstable callback references
+    const onTransactionRef = useRef(onTransaction);
+    const onSelectionChangeRef = useRef(onSelectionChange);
+    const onEditorViewReadyRef = useRef(onEditorViewReady);
+    const onEditorViewDestroyRef = useRef(onEditorViewDestroy);
+    const onKeyDownRef = useRef(onKeyDown);
+
+    // Keep refs in sync
+    onTransactionRef.current = onTransaction;
+    onSelectionChangeRef.current = onSelectionChange;
+    onEditorViewReadyRef.current = onEditorViewReady;
+    onEditorViewDestroyRef.current = onEditorViewDestroy;
+    onKeyDownRef.current = onKeyDown;
+
     // Keep document ref in sync
     documentRef.current = document;
 
@@ -218,6 +236,7 @@ const HiddenProseMirrorComponent = forwardRef<HiddenProseMirrorRef, HiddenProseM
 
     /**
      * Create EditorView with proper dispatch handling
+     * Uses refs for callbacks to avoid infinite re-render loops
      */
     const createView = useCallback(() => {
       if (!hostRef.current || isDestroyingRef.current) return;
@@ -233,17 +252,17 @@ const HiddenProseMirrorComponent = forwardRef<HiddenProseMirrorRef, HiddenProseM
           const newState = viewRef.current.state.apply(transaction);
           viewRef.current.updateState(newState);
 
-          // Notify about transaction
-          if (onTransaction) {
-            onTransaction(transaction, newState);
-          }
+          // Notify about transaction (use ref to avoid dependency issues)
+          onTransactionRef.current?.(transaction, newState);
 
-          // Notify about selection changes
+          // Notify about selection changes (use ref to avoid dependency issues)
           if (transaction.selectionSet || transaction.docChanged) {
-            if (onSelectionChange) {
-              onSelectionChange(newState);
-            }
+            onSelectionChangeRef.current?.(newState);
           }
+        },
+        // Intercept key events before ProseMirror processes them
+        handleKeyDown: (view: EditorView, event: KeyboardEvent): boolean => {
+          return onKeyDownRef.current?.(view, event) ?? false;
         },
         // Prevent focus handling from interfering with visual layer
         handleDOMEvents: {
@@ -260,18 +279,14 @@ const HiddenProseMirrorComponent = forwardRef<HiddenProseMirrorRef, HiddenProseM
 
       viewRef.current = new EditorView(hostRef.current, editorProps);
 
-      // Notify that view is ready
-      if (onEditorViewReady) {
-        onEditorViewReady(viewRef.current);
-      }
+      // Notify that view is ready (use ref to avoid dependency issues)
+      onEditorViewReadyRef.current?.(viewRef.current);
     }, [
       document,
       styles,
       externalPlugins,
       readOnly,
-      onTransaction,
-      onSelectionChange,
-      onEditorViewReady,
+      // Callbacks removed from dependencies - accessed via refs
     ]);
 
     /**
@@ -281,15 +296,14 @@ const HiddenProseMirrorComponent = forwardRef<HiddenProseMirrorRef, HiddenProseM
       if (viewRef.current && !isDestroyingRef.current) {
         isDestroyingRef.current = true;
 
-        if (onEditorViewDestroy) {
-          onEditorViewDestroy();
-        }
+        // Use ref to avoid dependency issues
+        onEditorViewDestroyRef.current?.();
 
         viewRef.current.destroy();
         viewRef.current = null;
         isDestroyingRef.current = false;
       }
-    }, [onEditorViewDestroy]);
+    }, []);
 
     // Mount/unmount
     useEffect(() => {
@@ -332,10 +346,10 @@ const HiddenProseMirrorComponent = forwardRef<HiddenProseMirrorRef, HiddenProseM
       const newState = createInitialState(document, styles, externalPlugins);
       viewRef.current.updateState(newState);
 
-      if (onSelectionChange) {
-        onSelectionChange(newState);
-      }
-    }, [document, styles, externalPlugins, onSelectionChange]);
+      // Use ref to avoid infinite loop when callback is unstable
+      onSelectionChangeRef.current?.(newState);
+    }, [document, styles, externalPlugins]);
+    // NOTE: onSelectionChange removed from dependencies - accessed via ref to prevent infinite loops
 
     // Update editable state
     useEffect(() => {

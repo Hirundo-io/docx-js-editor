@@ -312,7 +312,7 @@ function createTemplateDocument(): Document {
 // ============================================================================
 
 interface EditorWrapperProps {
-  editorRef: React.RefObject<DocxEditorRef>;
+  editorRef: React.RefObject<DocxEditorRef | null>;
   currentDocument: Document | null;
   documentBuffer: ArrayBuffer | null;
   onDocumentChange: (doc: Document) => void;

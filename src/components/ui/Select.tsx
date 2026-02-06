@@ -41,11 +41,16 @@ export function SimpleSelect({
         'bg-transparent hover:bg-slate-100/80 focus:bg-slate-100/80',
         'focus:outline-none cursor-pointer transition-colors duration-150',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        'appearance-none bg-no-repeat bg-right pr-6',
         className
       )}
       style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2394a3b8'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E")`,
+        // Inline styles for cross-environment compatibility
+        WebkitAppearance: 'none',
+        MozAppearance: 'none',
+        appearance: 'none',
+        paddingRight: '1.5rem',
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960' fill='%2364748b'%3E%3Cpath d='M480-360 280-560h400L480-360Z'/%3E%3C/svg%3E")`,
+        backgroundRepeat: 'no-repeat',
         backgroundSize: '1rem',
         backgroundPosition: 'right 0.25rem center',
       }}
@@ -103,7 +108,8 @@ function Select({ value, defaultValue = '', onValueChange, disabled, children }:
   const items: React.ReactNode[] = [];
   React.Children.forEach(children, (child) => {
     if (React.isValidElement(child) && child.type === SelectContent) {
-      items.push(child.props.children);
+      const props = child.props as { children?: React.ReactNode };
+      items.push(props.children);
     }
   });
 
@@ -119,11 +125,16 @@ function Select({ value, defaultValue = '', onValueChange, disabled, children }:
           'h-8 px-2 py-1 rounded text-sm text-slate-700',
           'bg-transparent hover:bg-slate-100/80 focus:bg-slate-100/80',
           'focus:outline-none cursor-pointer transition-colors duration-150',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          'appearance-none bg-no-repeat bg-right pr-6'
+          'disabled:cursor-not-allowed disabled:opacity-50'
         )}
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2394a3b8'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E")`,
+          // Inline styles for cross-environment compatibility
+          WebkitAppearance: 'none',
+          MozAppearance: 'none',
+          appearance: 'none',
+          paddingRight: '1.5rem',
+          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960' fill='%2364748b'%3E%3Cpath d='M480-360 280-560h400L480-360Z'/%3E%3C/svg%3E")`,
+          backgroundRepeat: 'no-repeat',
           backgroundSize: '1rem',
           backgroundPosition: 'right 0.25rem center',
         }}
@@ -175,10 +186,26 @@ interface SelectItemProps {
   disabled?: boolean;
 }
 
-function SelectItem({ value, children, style, disabled }: SelectItemProps) {
+/**
+ * Extract plain text from React children.
+ * Native <option> elements can only contain text, not HTML elements.
+ */
+function extractText(children: React.ReactNode): string {
+  if (typeof children === 'string') return children;
+  if (typeof children === 'number') return String(children);
+  if (Array.isArray(children)) return children.map(extractText).join('');
+  if (React.isValidElement(children)) {
+    const props = children.props as { children?: React.ReactNode };
+    return extractText(props.children);
+  }
+  return '';
+}
+
+function SelectItem({ value, children, style: _style, disabled }: SelectItemProps) {
+  // Native <option> can only contain text - extract text from any nested elements
   return (
-    <option value={value} style={style} disabled={disabled}>
-      {children}
+    <option value={value} disabled={disabled}>
+      {extractText(children)}
     </option>
   );
 }
@@ -200,7 +227,7 @@ function SelectLabel({ children }: SelectLabelProps) {
   // Render as disabled option to act as group label
   return (
     <option disabled style={{ fontWeight: 500, color: '#64748b' }}>
-      {children}
+      {extractText(children)}
     </option>
   );
 }

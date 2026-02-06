@@ -614,10 +614,10 @@ export function renderLine(
     }
   }
 
-  // Use white-space: nowrap to prevent internal wrapping - all line breaking
-  // is done during measurement. Text that doesn't fit will overflow visibly
-  // rather than causing paragraph overlap.
-  lineEl.style.whiteSpace = 'nowrap';
+  // Use white-space: pre to prevent internal wrapping AND preserve consecutive spaces.
+  // All line breaking is done during measurement. 'pre' ensures multiple spaces
+  // are rendered visually (unlike 'nowrap' which collapses them).
+  lineEl.style.whiteSpace = 'pre';
   lineEl.style.overflow = 'visible'; // Allow text to render fully (don't clip descenders)
 
   // NOTE: Per-line floating image margins are NOT applied here because:

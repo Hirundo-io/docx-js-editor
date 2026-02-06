@@ -42,15 +42,23 @@ export function Tooltip({ content, children, side = 'bottom', delayMs = 400 }: T
     };
   }, []);
 
-  const child = React.cloneElement(children, {
+  // Type the child props for React 19 compatibility
+  type ChildProps = {
+    ref?: React.Ref<HTMLElement>;
+    onMouseEnter?: (e: React.MouseEvent) => void;
+    onMouseLeave?: (e: React.MouseEvent) => void;
+  };
+  const childProps = children.props as ChildProps;
+
+  const child = React.cloneElement(children as React.ReactElement<ChildProps>, {
     ref: triggerRef,
     onMouseEnter: (e: React.MouseEvent) => {
       handleMouseEnter();
-      children.props.onMouseEnter?.(e);
+      childProps.onMouseEnter?.(e);
     },
     onMouseLeave: (e: React.MouseEvent) => {
       handleMouseLeave();
-      children.props.onMouseLeave?.(e);
+      childProps.onMouseLeave?.(e);
     },
   });
 

@@ -10,6 +10,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
   SelectSeparator,
@@ -115,7 +116,7 @@ export function LineSpacingPicker({
           </SelectItem>
         ))}
         <SelectSeparator />
-        <div className="px-2 py-1.5 text-xs text-muted-foreground">Paragraph spacing</div>
+        <SelectLabel>Paragraph spacing</SelectLabel>
       </SelectContent>
     </Select>
   );

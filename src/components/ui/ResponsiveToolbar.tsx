@@ -82,7 +82,7 @@ export interface ResponsiveToolbarProps {
  */
 export interface UseResponsiveToolbarOptions {
   /** Container ref */
-  containerRef: React.RefObject<HTMLElement>;
+  containerRef: React.RefObject<HTMLElement | null>;
   /** Total items */
   items: ToolbarItem[];
   /** Gap between items */
@@ -252,7 +252,7 @@ interface OverflowMenuProps {
   items: ToolbarItem[];
   isOpen: boolean;
   onClose: () => void;
-  anchorRef: React.RefObject<HTMLElement>;
+  anchorRef: React.RefObject<HTMLElement | null>;
 }
 
 const OverflowMenu: React.FC<OverflowMenuProps> = ({ items, isOpen, onClose, anchorRef }) => {

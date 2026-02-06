@@ -225,6 +225,11 @@ export const PluginHost = forwardRef<PluginHostRef, PluginHostProps>(function Pl
   // Editor view reference
   const [editorView, setEditorView] = useState<EditorView | null>(null);
 
+  // Store children.props in a ref to avoid infinite re-render loops
+  // when the child editor has unstable callback references
+  const childrenPropsRef = useRef(children.props);
+  childrenPropsRef.current = children.props;
+
   // Rendered DOM context (received from PagedEditor)
   const [renderedDomContext, setRenderedDomContext] = useState<
     import('./types').RenderedDomContext | null
@@ -590,29 +595,40 @@ export const PluginHost = forwardRef<PluginHostRef, PluginHostProps>(function Pl
   ]);
 
   // Callback to receive rendered DOM context from editor
+  // Uses ref to avoid infinite loops when child has unstable callbacks
   const handleRenderedDomContextReady = useCallback(
     (context: import('./types').RenderedDomContext) => {
       setRenderedDomContext(context);
-      // Call original callback if any
-      const originalCallback = (children.props as Record<string, unknown>)
+      // Call original callback if any - use ref to avoid dependency issues
+      const originalCallback = (childrenPropsRef.current as Record<string, unknown>)
         ?.onRenderedDomContextReady;
       if (typeof originalCallback === 'function') {
         originalCallback(context);
       }
     },
-    [children.props]
+    []
+    // NOTE: children.props removed from dependencies - accessed via ref to prevent infinite loops
   );
 
   // Clone the child editor with additional props
+  // Define the props we're injecting into the child editor
+  type InjectedEditorProps = {
+    externalPlugins?: ProseMirrorPlugin[];
+    pluginOverlays?: React.ReactNode;
+    onRenderedDomContextReady?: (context: import('./types').RenderedDomContext) => void;
+    onEditorViewReady?: (view: EditorView) => void;
+  };
+
   const editorElement = useMemo(() => {
-    return cloneElement(children, {
+    return cloneElement(children as React.ReactElement<InjectedEditorProps>, {
       externalPlugins: externalProseMirrorPlugins,
       pluginOverlays,
       onRenderedDomContextReady: handleRenderedDomContextReady,
       onEditorViewReady: (view: EditorView) => {
         setEditorView(view);
-        // Call original callback if any
-        const originalCallback = (children.props as Record<string, unknown>)?.onEditorViewReady;
+        // Call original callback if any - use ref to avoid dependency issues
+        const originalCallback = (childrenPropsRef.current as Record<string, unknown>)
+          ?.onEditorViewReady;
         if (typeof originalCallback === 'function') {
           originalCallback(view);
         }
