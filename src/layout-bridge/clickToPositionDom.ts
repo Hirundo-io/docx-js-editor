@@ -43,7 +43,7 @@ export function clickToPositionDom(
     return findPositionInSpan(spanEl, clientX, clientY);
   }
 
-  // Check for empty paragraphs
+  // Check for empty paragraphs (including inside table cells)
   const emptyRun = elements.find((el) =>
     el.classList.contains('layout-empty-run')
   ) as HTMLElement | null;
@@ -52,6 +52,16 @@ export function clickToPositionDom(
     if (paragraph && paragraph.dataset.pmStart) {
       return Number(paragraph.dataset.pmStart);
     }
+  }
+
+  // Check for paragraph elements directly (handles table cells where the
+  // narrow empty-run span isn't hit but the parent paragraph div is)
+  const paragraphEl = elements.find(
+    (el) =>
+      el.classList.contains('layout-paragraph') && (el as HTMLElement).dataset.pmStart !== undefined
+  ) as HTMLElement | null;
+  if (paragraphEl && paragraphEl.dataset.pmStart) {
+    return Number(paragraphEl.dataset.pmStart);
   }
 
   // Fallback: Find nearest text span

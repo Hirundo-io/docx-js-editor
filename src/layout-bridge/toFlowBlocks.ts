@@ -543,7 +543,17 @@ function convertTable(node: PMNode, startPos: number, options: ToFlowBlocksOptio
 
   // Extract columnWidths from node attributes and convert from twips to pixels
   const columnWidthsTwips = node.attrs.columnWidths as number[] | undefined;
-  const columnWidths = columnWidthsTwips?.map(twipsToPixels);
+  let columnWidths = columnWidthsTwips?.map(twipsToPixels);
+
+  // Fallback: compute column widths from first row cell widths if table attr is missing
+  if (!columnWidths && rows.length > 0) {
+    const firstRow = rows[0];
+    const cellWidths = firstRow.cells.map((cell) => cell.width);
+    // Only use if all cells have widths defined
+    if (cellWidths.every((w) => w !== undefined && w > 0)) {
+      columnWidths = cellWidths as number[];
+    }
+  }
 
   // Extract justification
   const justification = node.attrs.justification as 'left' | 'center' | 'right' | undefined;

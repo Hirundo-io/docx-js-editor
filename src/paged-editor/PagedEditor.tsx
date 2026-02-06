@@ -52,7 +52,7 @@ import type {
 // Layout bridge
 import { toFlowBlocks } from '../layout-bridge/toFlowBlocks';
 import { measureParagraph, type FloatingImageZone } from '../layout-bridge/measuring';
-import { hitTestFragment } from '../layout-bridge/hitTest';
+import { hitTestFragment, hitTestTableCell } from '../layout-bridge/hitTest';
 import { clickToPosition } from '../layout-bridge/clickToPosition';
 import { clickToPositionDom } from '../layout-bridge/clickToPositionDom';
 import {
@@ -399,7 +399,13 @@ function measureBlock(
       // Simple table measure - calculate dimensions with proper column handling
       const tableBlock = block as TableBlock;
       // columnWidths are already in pixels (converted in toFlowBlocks)
-      const columnWidths = tableBlock.columnWidths ?? [];
+      // If missing, compute equal widths from content width and column count
+      let columnWidths = tableBlock.columnWidths ?? [];
+      if (columnWidths.length === 0 && tableBlock.rows.length > 0) {
+        const colCount = tableBlock.rows[0].cells.length;
+        const equalWidth = contentWidth / colCount;
+        columnWidths = Array(colCount).fill(equalWidth);
+      }
 
       // Calculate cell widths based on colSpan and columnWidths
       const rows = tableBlock.rows.map((row) => {
@@ -1359,6 +1365,15 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
         });
 
         if (!fragmentHit) return null;
+
+        // For table fragments, do cell-level hit testing
+        if (fragmentHit.fragment.kind === 'table') {
+          const tableCellHit = hitTestTableCell(pageHit, blocks, measures, {
+            x: pageX,
+            y: pageY,
+          });
+          return clickToPosition(fragmentHit, tableCellHit);
+        }
 
         return clickToPosition(fragmentHit);
       },

@@ -153,35 +153,44 @@ export function getTableContext(state: EditorState): TableContextInfo {
  */
 export function createTable(rows: number, cols: number, borderColor: string = '000000'): PMNode {
   const tableRows: PMNode[] = [];
-  // Calculate equal width percentage for each column
-  const colWidthPercent = Math.floor(100 / cols);
+
+  // Standard US Letter content width in twips (12240 - 2*1440 margins = 9360)
+  const defaultContentWidthTwips = 9360;
+  const colWidthTwips = Math.floor(defaultContentWidthTwips / cols);
 
   // Default borders for all cells (all sides enabled)
   const defaultBorders = { top: true, bottom: true, left: true, right: true };
+  const defaultBorderColors = {
+    top: borderColor,
+    bottom: borderColor,
+    left: borderColor,
+    right: borderColor,
+  };
+  // 4 eighths of a point = 0.5pt (standard thin border)
+  const defaultBorderWidths = { top: 4, bottom: 4, left: 4, right: 4 };
 
   for (let r = 0; r < rows; r++) {
     const cells: PMNode[] = [];
     for (let c = 0; c < cols; c++) {
       // Each cell contains at least one paragraph
       const paragraph = schema.nodes.paragraph.create();
-      // Set width on first row cells to define column widths
-      // All cells get borders with the specified color
-      const cellAttrs: any = {
+      const cellAttrs: Record<string, unknown> = {
         colspan: 1,
         rowspan: 1,
         borders: defaultBorders,
-        borderColor: borderColor,
+        borderColors: defaultBorderColors,
+        borderWidths: defaultBorderWidths,
+        width: colWidthTwips,
+        widthType: 'dxa',
       };
-      if (r === 0) {
-        cellAttrs.width = colWidthPercent;
-        cellAttrs.widthType = 'pct';
-      }
       cells.push(schema.nodes.tableCell.create(cellAttrs, paragraph));
     }
     tableRows.push(schema.nodes.tableRow.create(null, cells));
   }
 
-  return schema.nodes.table.create(null, tableRows);
+  // Set columnWidths on the table node so layout engine knows column sizes
+  const columnWidths = Array(cols).fill(colWidthTwips);
+  return schema.nodes.table.create({ columnWidths }, tableRows);
 }
 
 /**
