@@ -78,7 +78,7 @@ export function TemplateHighlightOverlay({
   }, [context, tags]);
 
   // Compute synchronously — no useEffect gap that causes blinking
-   
+
   const highlights = useMemo(() => computeHighlights(), [computeHighlights, layoutVersion]);
 
   // Recompute on window resize

@@ -119,7 +119,6 @@ export function AnnotationPanel({
     return newPositions;
   }, [visibleTags, renderedDomContext]);
 
-   
   const positions = useMemo(() => computePositions(), [computePositions, layoutVersion]);
 
   // ResizeObserver for zoom/layout changes
