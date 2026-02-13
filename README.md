@@ -21,6 +21,8 @@ Open-source WYSIWYG DOCX editor for React. Open, edit, and save `.docx` files en
   </a>
 </p>
 
+We built it for ourselves in eigenpal.com in order to have an editor for `.docx` files, which serve as AI document workflow output templates for our clients.
+
 ### Framework Examples
 
 | Framework                                                                                                           | Example                                                                        |
