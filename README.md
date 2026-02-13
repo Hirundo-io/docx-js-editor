@@ -13,7 +13,7 @@
 
 # @eigenpal/docx-js-editor
 
-Open-source WYSIWYG DOCX editor for React. Open, edit, and save `.docx` files entirely in the browser — no server required. [Try the live demo.](https://docx-editor-vite.vercel.app/)
+Open-source WYSIWYG DOCX editor for React. Open, edit, and save `.docx` files entirely in the browser — no server required. [Try the live demo.](https://docx-js-editor.vercel.app/)
 
 <p align="center">
   <a href="https://docx-js-editor.vercel.app/">
