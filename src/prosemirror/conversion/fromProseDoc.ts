@@ -587,9 +587,25 @@ function createFieldFromNode(node: PMNode, marks?: readonly Mark[]): SimpleField
 
   const formatting = marks && marks.length > 0 ? marksToTextFormatting(marks) : undefined;
 
+  // Provide fallback display text for dynamic fields so <w:t> is never empty
+  let displayText = attrs.displayText || '';
+  if (!displayText) {
+    switch (attrs.fieldType) {
+      case 'PAGE':
+        displayText = '1';
+        break;
+      case 'NUMPAGES':
+        displayText = '1';
+        break;
+      default:
+        displayText = ' ';
+        break;
+    }
+  }
+
   const displayRun: Run = {
     type: 'run',
-    content: [{ type: 'text' as const, text: attrs.displayText || '' }],
+    content: [{ type: 'text' as const, text: displayText }],
     ...(formatting && Object.keys(formatting).length > 0 ? { formatting } : {}),
   };
 
@@ -800,10 +816,12 @@ function marksToTextFormatting(marks: readonly Mark[]): TextFormatting {
     switch (mark.type.name) {
       case 'bold':
         formatting.bold = true;
+        formatting.boldCs = true;
         break;
 
       case 'italic':
         formatting.italic = true;
+        formatting.italicCs = true;
         break;
 
       case 'underline': {
@@ -840,6 +858,7 @@ function marksToTextFormatting(marks: readonly Mark[]): TextFormatting {
 
       case 'fontSize':
         formatting.fontSize = mark.attrs.size;
+        formatting.fontSizeCs = mark.attrs.size;
         break;
 
       case 'fontFamily': {
@@ -847,6 +866,8 @@ function marksToTextFormatting(marks: readonly Mark[]): TextFormatting {
         formatting.fontFamily = {
           ascii: attrs.ascii,
           hAnsi: attrs.hAnsi,
+          // Set cs to match ascii for Complex Script compatibility
+          cs: attrs.ascii || undefined,
           // asciiTheme needs to be cast to the proper type or undefined
           asciiTheme: attrs.asciiTheme as
             | 'majorAscii'

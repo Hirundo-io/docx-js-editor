@@ -88,7 +88,7 @@ export const FieldExtension = createNodeExtension({
           'data-field-kind': fieldKind,
           ...(fldLock ? { 'data-fld-lock': 'true' } : {}),
           ...(dirty ? { 'data-dirty': 'true' } : {}),
-          style: 'background: rgba(200,200,200,0.2); padding: 0 1px; border-radius: 2px;',
+          style: 'outline: 1px solid rgba(200,200,200,0.4); padding: 0 1px; border-radius: 2px;',
         },
         text,
       ];

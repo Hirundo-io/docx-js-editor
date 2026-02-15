@@ -32,6 +32,8 @@
 import JSZip from 'jszip';
 import type { Document } from '../types/document';
 import { serializeDocument } from './serializer/documentSerializer';
+import { serializeHeaderFooter } from './serializer/headerFooterSerializer';
+import { RELATIONSHIP_TYPES } from './relsParser';
 import { type RawDocxContent } from './unzip';
 
 // ============================================================================
@@ -99,6 +101,9 @@ export async function repackDocx(doc: Document, options: RepackOptions = {}): Pr
     compression: 'DEFLATE',
     compressionOptions: { level: compressionLevel },
   });
+
+  // Serialize and update modified headers/footers
+  serializeHeadersFootersToZip(doc, newZip, compressionLevel);
 
   // Optionally update modification date in docProps/core.xml
   if (updateModifiedDate) {
@@ -171,6 +176,9 @@ export async function repackDocxFromRaw(
     compression: 'DEFLATE',
     compressionOptions: { level: compressionLevel },
   });
+
+  // Serialize and update modified headers/footers
+  serializeHeadersFootersToZip(doc, newZip, compressionLevel);
 
   // Optionally update core properties
   if (updateModifiedDate && rawContent.corePropsXml) {
@@ -424,6 +432,47 @@ export async function addMedia(
     rId: relResult.rId,
     path: mediaPath,
   };
+}
+
+// ============================================================================
+// HEADER/FOOTER SERIALIZATION
+// ============================================================================
+
+/**
+ * Serialize modified headers and footers into the ZIP
+ *
+ * Maps rId → filename via relationships, then serializes each
+ * HeaderFooter object to its corresponding word/header*.xml or word/footer*.xml
+ */
+function serializeHeadersFootersToZip(doc: Document, zip: JSZip, compressionLevel: number): void {
+  const rels = doc.package.relationships;
+  if (!rels) return;
+
+  const compressionOptions = { level: compressionLevel };
+
+  // Serialize headers
+  if (doc.package.headers) {
+    for (const [rId, headerFooter] of doc.package.headers.entries()) {
+      const rel = rels.get(rId);
+      if (rel && rel.type === RELATIONSHIP_TYPES.header && rel.target) {
+        const filename = rel.target.startsWith('/') ? rel.target.slice(1) : `word/${rel.target}`;
+        const xml = serializeHeaderFooter(headerFooter);
+        zip.file(filename, xml, { compression: 'DEFLATE', compressionOptions });
+      }
+    }
+  }
+
+  // Serialize footers
+  if (doc.package.footers) {
+    for (const [rId, headerFooter] of doc.package.footers.entries()) {
+      const rel = rels.get(rId);
+      if (rel && rel.type === RELATIONSHIP_TYPES.footer && rel.target) {
+        const filename = rel.target.startsWith('/') ? rel.target.slice(1) : `word/${rel.target}`;
+        const xml = serializeHeaderFooter(headerFooter);
+        zip.file(filename, xml, { compression: 'DEFLATE', compressionOptions });
+      }
+    }
+  }
 }
 
 // ============================================================================

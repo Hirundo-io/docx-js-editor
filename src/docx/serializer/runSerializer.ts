@@ -291,9 +291,29 @@ export function serializeTextFormatting(formatting: TextFormatting | undefined):
     parts.push(`<w:szCs w:val="${formatting.fontSizeCs}"/>`);
   }
 
-  // Highlight
+  // Highlight — only emit valid OOXML named colors (not CSS values)
   if (formatting.highlight && formatting.highlight !== 'none') {
-    parts.push(`<w:highlight w:val="${formatting.highlight}"/>`);
+    const validHighlightColors = new Set([
+      'black',
+      'blue',
+      'cyan',
+      'darkBlue',
+      'darkCyan',
+      'darkGray',
+      'darkGreen',
+      'darkMagenta',
+      'darkRed',
+      'darkYellow',
+      'green',
+      'lightGray',
+      'magenta',
+      'red',
+      'white',
+      'yellow',
+    ]);
+    if (validHighlightColors.has(formatting.highlight)) {
+      parts.push(`<w:highlight w:val="${formatting.highlight}"/>`);
+    }
   }
 
   // Underline

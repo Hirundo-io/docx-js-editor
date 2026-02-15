@@ -135,7 +135,7 @@ function convertParagraph(
       const linkNodes = convertHyperlink(content, mergedStyleRunFormatting, styleResolver);
       inlineNodes.push(...linkNodes);
     } else if (content.type === 'simpleField' || content.type === 'complexField') {
-      const fieldNode = convertField(content);
+      const fieldNode = convertField(content, mergedStyleRunFormatting);
       if (fieldNode) inlineNodes.push(fieldNode);
     } else if (content.type === 'inlineSdt') {
       const sdtNode = convertInlineSdt(content, mergedStyleRunFormatting, styleResolver);
@@ -899,10 +899,17 @@ function convertTableCell(
 
 /**
  * Convert a SimpleField or ComplexField to a ProseMirror field node.
+ * Preserves run formatting (bold, fontSize, color, etc.) as PM marks.
+ * Accepts styleFormatting so fields inherit paragraph-level formatting
+ * (same as convertRun does for regular text runs).
  */
-function convertField(field: SimpleField | ComplexField): PMNode | null {
-  // Extract display text from field content/result
+function convertField(
+  field: SimpleField | ComplexField,
+  styleFormatting?: TextFormatting
+): PMNode | null {
+  // Extract display text and formatting from field content/result
   let displayText = '';
+  let fieldFormatting: TextFormatting | undefined;
   const runs = field.type === 'simpleField' ? field.content : field.fieldResult;
   if (runs) {
     for (const r of runs) {
@@ -910,18 +917,31 @@ function convertField(field: SimpleField | ComplexField): PMNode | null {
         for (const c of r.content) {
           if (c.type === 'text') displayText += c.text;
         }
+        // Use formatting from the first run that has it
+        if (!fieldFormatting && r.formatting) {
+          fieldFormatting = r.formatting;
+        }
       }
     }
   }
 
-  return schema.node('field', {
-    fieldType: field.fieldType,
-    instruction: field.instruction,
-    displayText,
-    fieldKind: field.type === 'simpleField' ? 'simple' : 'complex',
-    fldLock: field.fldLock ?? false,
-    dirty: field.dirty ?? false,
-  });
+  // Merge style formatting with field run formatting (inline takes precedence)
+  const mergedFormatting = mergeTextFormatting(styleFormatting, fieldFormatting);
+  const marks = textFormattingToMarks(mergedFormatting);
+
+  return schema.node(
+    'field',
+    {
+      fieldType: field.fieldType,
+      instruction: field.instruction,
+      displayText,
+      fieldKind: field.type === 'simpleField' ? 'simple' : 'complex',
+      fldLock: field.fldLock ?? false,
+      dirty: field.dirty ?? false,
+    },
+    undefined,
+    marks
+  );
 }
 
 /**

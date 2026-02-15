@@ -14,6 +14,7 @@ import type {
   Paragraph,
   ParagraphContent,
   ParagraphFormatting,
+  Run,
   Hyperlink,
   BookmarkStart,
   BookmarkEnd,
@@ -560,32 +561,48 @@ function serializeBookmarkEnd(bookmark: BookmarkEnd): string {
 }
 
 /**
- * Serialize a simple field (w:fldSimple)
+ * Serialize a simple field as a complex field (fldChar begin/separate/end).
+ * Complex field format is more widely supported by OOXML consumers
+ * (Google Docs, Apple Pages) than w:fldSimple.
  */
 function serializeSimpleField(field: SimpleField): string {
-  const attrs: string[] = [`w:instr="${escapeXml(field.instruction)}"`];
+  const parts: string[] = [];
 
+  // Extract formatting from the first content run
+  const firstRun = field.content.find((c): c is Run => c.type === 'run');
+  const rPrXml = firstRun?.formatting ? serializeTextFormatting(firstRun.formatting) : '';
+
+  // Begin field character
+  const beginAttrs: string[] = ['w:fldCharType="begin"'];
   if (field.fldLock) {
-    attrs.push('w:fldLock="true"');
+    beginAttrs.push('w:fldLock="true"');
+  }
+  parts.push(`<w:r>${rPrXml}<w:fldChar ${beginAttrs.join(' ')}/></w:r>`);
+
+  // Field code (instrText)
+  const needsPreserve =
+    field.instruction.startsWith(' ') ||
+    field.instruction.endsWith(' ') ||
+    field.instruction.includes('  ');
+  const spaceAttr = needsPreserve ? ' xml:space="preserve"' : '';
+  parts.push(
+    `<w:r>${rPrXml}<w:instrText${spaceAttr}>${escapeXml(field.instruction)}</w:instrText></w:r>`
+  );
+
+  // Separate field character
+  parts.push(`<w:r>${rPrXml}<w:fldChar w:fldCharType="separate"/></w:r>`);
+
+  // Field result (the display runs)
+  for (const item of field.content) {
+    if (item.type === 'run') {
+      parts.push(serializeRun(item));
+    }
   }
 
-  if (field.dirty) {
-    attrs.push('w:dirty="true"');
-  }
+  // End field character
+  parts.push(`<w:r>${rPrXml}<w:fldChar w:fldCharType="end"/></w:r>`);
 
-  // Serialize content
-  const contentXml = field.content
-    .map((item) => {
-      if (item.type === 'run') {
-        return serializeRun(item);
-      } else if (item.type === 'hyperlink') {
-        return serializeHyperlink(item);
-      }
-      return '';
-    })
-    .join('');
-
-  return `<w:fldSimple ${attrs.join(' ')}>${contentXml}</w:fldSimple>`;
+  return parts.join('');
 }
 
 /**
@@ -596,15 +613,19 @@ function serializeSimpleField(field: SimpleField): string {
 function serializeComplexField(field: ComplexField): string {
   const parts: string[] = [];
 
-  // Begin field character
+  // Extract formatting from the first result run to apply to structural runs
+  // (begin/separate/end). OOXML consumers expect consistent formatting across
+  // all runs in a complex field.
+  const resultFormatting = field.fieldResult?.[0]?.formatting;
+  const rPrXml = resultFormatting ? serializeTextFormatting(resultFormatting) : '';
+
+  // Begin field character (never set dirty — dirty causes apps to recalculate
+  // and potentially discard run formatting)
   const beginAttrs: string[] = ['w:fldCharType="begin"'];
   if (field.fldLock) {
     beginAttrs.push('w:fldLock="true"');
   }
-  if (field.dirty) {
-    beginAttrs.push('w:dirty="true"');
-  }
-  parts.push(`<w:r><w:fldChar ${beginAttrs.join(' ')}/></w:r>`);
+  parts.push(`<w:r>${rPrXml}<w:fldChar ${beginAttrs.join(' ')}/></w:r>`);
 
   // Field code (instrText)
   if (field.fieldCode.length > 0) {
@@ -616,17 +637,19 @@ function serializeComplexField(field: ComplexField): string {
       field.instruction.endsWith(' ') ||
       field.instruction.includes('  ');
     const spaceAttr = needsPreserve ? ' xml:space="preserve"' : '';
-    parts.push(`<w:r><w:instrText${spaceAttr}>${escapeXml(field.instruction)}</w:instrText></w:r>`);
+    parts.push(
+      `<w:r>${rPrXml}<w:instrText${spaceAttr}>${escapeXml(field.instruction)}</w:instrText></w:r>`
+    );
   }
 
   // Separate field character
-  parts.push('<w:r><w:fldChar w:fldCharType="separate"/></w:r>');
+  parts.push(`<w:r>${rPrXml}<w:fldChar w:fldCharType="separate"/></w:r>`);
 
   // Field result
   parts.push(...field.fieldResult.map((run) => serializeRun(run)));
 
   // End field character
-  parts.push('<w:r><w:fldChar w:fldCharType="end"/></w:r>');
+  parts.push(`<w:r>${rPrXml}<w:fldChar w:fldCharType="end"/></w:r>`);
 
   return parts.join('');
 }
