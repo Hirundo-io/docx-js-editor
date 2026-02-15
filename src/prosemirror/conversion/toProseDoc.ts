@@ -113,12 +113,12 @@ function convertParagraph(
     styleRunFormatting = resolved.runFormatting;
   }
 
-  // Merge in paragraph-level run properties and extra formatting (e.g., table style conditional rPr)
-  const withParagraphRunProps = mergeTextFormatting(
-    styleRunFormatting,
-    paragraph.formatting?.runProperties
-  );
-  const mergedStyleRunFormatting = mergeTextFormatting(withParagraphRunProps, extraRunFormatting);
+  // NOTE: paragraph.formatting?.runProperties is the paragraph mark formatting (pPr/rPr).
+  // Per ECMA-376, this only applies to the paragraph mark glyph (¶), NOT to text runs.
+  // Style-level rPr (from styleResolver) already provides default run formatting.
+
+  // Merge in extra formatting (e.g., table style conditional rPr)
+  const mergedStyleRunFormatting = mergeTextFormatting(styleRunFormatting, extraRunFormatting);
 
   for (const content of paragraph.content) {
     if (content.type === 'commentRangeStart') {
@@ -1009,8 +1009,13 @@ function convertRun(
 
   // Merge style formatting with run's inline formatting
   // Inline formatting takes precedence over style formatting
+  //
+  // Use getRunStyleOwnProperties (not resolveRunStyle) to avoid docDefaults
+  // from the character style overriding paragraph style properties.
+  // The styleFormatting parameter already includes docDefaults from paragraph
+  // style resolution, so we only need the character style's own properties.
   const runStyleFormatting = run.formatting?.styleId
-    ? styleResolver?.resolveRunStyle(run.formatting.styleId)
+    ? styleResolver?.getRunStyleOwnProperties(run.formatting.styleId)
     : undefined;
   const mergedFormatting = mergeTextFormatting(
     mergeTextFormatting(styleFormatting, runStyleFormatting),

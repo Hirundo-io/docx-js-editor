@@ -945,8 +945,22 @@ export function renderParagraphFragment(
     const lineLeftOffset = line.leftOffset ?? 0;
     const lineRightOffset = line.rightOffset ?? 0;
 
+    // For first line, adjust available width for hanging/firstLine indent
+    // Measurement uses: baseFirstLineWidth = bodyContentWidth - (firstLine - hanging)
+    // So hanging gives MORE width, firstLine gives LESS width
+    let lineAvailableWidth = availableWidth;
+    if (isFirstLine) {
+      const hasHangingIndent = indent?.hanging && indent.hanging > 0;
+      const hasFirstLineIndent = indent?.firstLine && indent.firstLine > 0;
+      if (hasHangingIndent && indent?.hanging) {
+        lineAvailableWidth = availableWidth + indent.hanging;
+      } else if (hasFirstLineIndent && indent?.firstLine) {
+        lineAvailableWidth = availableWidth - indent.firstLine;
+      }
+    }
+
     const lineEl = renderLine(block, line, alignment, doc, {
-      availableWidth: availableWidth - lineLeftOffset - lineRightOffset,
+      availableWidth: lineAvailableWidth - lineLeftOffset - lineRightOffset,
       isLastLine,
       isFirstLine,
       paragraphEndsWithLineBreak,

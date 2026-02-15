@@ -166,6 +166,17 @@ function extractRunFormatting(marks: readonly Mark[], theme?: Theme | null): Run
         };
         break;
       }
+
+      case 'footnoteRef': {
+        const attrs = mark.attrs as { id: string | number; noteType?: string };
+        const id = typeof attrs.id === 'string' ? parseInt(attrs.id, 10) : attrs.id;
+        if (attrs.noteType === 'endnote') {
+          formatting.endnoteRefId = id;
+        } else {
+          formatting.footnoteRefId = id;
+        }
+        break;
+      }
     }
   }
 
@@ -502,6 +513,22 @@ function convertParagraphAttrs(pmAttrs: PMParagraphAttrs): ParagraphAttrs {
   }
   if (pmAttrs.listIsBullet != null) {
     attrs.listIsBullet = pmAttrs.listIsBullet;
+  }
+
+  // Default font for empty paragraph measurement (from style's rPr / pPr/rPr)
+  const dtf = pmAttrs.defaultTextFormatting as
+    | { fontSize?: number; fontFamily?: { ascii?: string; hAnsi?: string } }
+    | undefined;
+  if (dtf) {
+    if (dtf.fontSize != null) {
+      // fontSize in TextFormatting is in half-points, convert to points
+      attrs.defaultFontSize = dtf.fontSize / 2;
+    }
+    if (dtf.fontFamily) {
+      attrs.defaultFontFamily = (dtf.fontFamily.ascii || dtf.fontFamily.hAnsi) as
+        | string
+        | undefined;
+    }
   }
 
   return attrs;

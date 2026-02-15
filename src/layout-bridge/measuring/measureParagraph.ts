@@ -153,9 +153,10 @@ function calculateTypographyMetrics(
  */
 function calculateEmptyParagraphMetrics(
   fontSize: number,
-  spacing?: ParagraphSpacing
+  spacing?: ParagraphSpacing,
+  fontFamily?: string
 ): LineTypography {
-  const metrics = getFontMetrics({ fontSize, fontFamily: DEFAULT_FONT_FAMILY });
+  const metrics = getFontMetrics({ fontSize, fontFamily: fontFamily ?? DEFAULT_FONT_FAMILY });
   return calculateTypographyMetrics(fontSize, spacing, metrics);
 }
 
@@ -310,7 +311,9 @@ export function measureParagraph(
 
   // Handle empty paragraph
   if (runs.length === 0) {
-    const emptyMetrics = calculateEmptyParagraphMetrics(DEFAULT_FONT_SIZE, spacing);
+    const emptyFontSize = attrs?.defaultFontSize ?? DEFAULT_FONT_SIZE;
+    const emptyFontFamily = attrs?.defaultFontFamily ?? DEFAULT_FONT_FAMILY;
+    const emptyMetrics = calculateEmptyParagraphMetrics(emptyFontSize, spacing, emptyFontFamily);
     lines.push({
       fromRun: 0,
       fromChar: 0,
@@ -330,8 +333,9 @@ export function measureParagraph(
   // Check for empty text run only
   if (runs.length === 1 && isTextRun(runs[0]) && isEmptyTextRun(runs[0] as TextRun)) {
     const run = runs[0] as TextRun;
-    const fontSize = run.fontSize ?? DEFAULT_FONT_SIZE;
-    const emptyMetrics = calculateEmptyParagraphMetrics(fontSize, spacing);
+    const fontSize = run.fontSize ?? attrs?.defaultFontSize ?? DEFAULT_FONT_SIZE;
+    const fontFamily = run.fontFamily ?? attrs?.defaultFontFamily ?? DEFAULT_FONT_FAMILY;
+    const emptyMetrics = calculateEmptyParagraphMetrics(fontSize, spacing, fontFamily);
 
     lines.push({
       fromRun: 0,
