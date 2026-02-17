@@ -871,8 +871,8 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
           let width = img.naturalWidth;
           let height = img.naturalHeight;
 
-          // Constrain to reasonable max width (612px ~ 6.375 inches at 96dpi)
-          const maxWidth = 612;
+          // Constrain to reasonable max width (content area of US Letter page at 96dpi)
+          const maxWidth = 612; // ~6.375 inches
           if (width > maxWidth) {
             const scale = maxWidth / width;
             width = maxWidth;
