@@ -231,6 +231,8 @@ export interface DocxEditorProps {
   placeholder?: ReactNode;
   /** Loading indicator */
   loadingIndicator?: ReactNode;
+  /** Whether to show the document outline sidebar (default: false) */
+  showOutline?: boolean;
   /** Whether to show print button in toolbar (default: true) */
   showPrintButton?: boolean;
   /** Print options for print preview */
@@ -353,6 +355,7 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
     style,
     placeholder,
     loadingIndicator,
+    showOutline: showOutlineProp = false,
     showPrintButton = true,
     printOptions: _printOptions,
     onPrint,
@@ -391,10 +394,21 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
   // Header/footer editing state
   const [hfEditPosition, setHfEditPosition] = useState<'header' | 'footer' | null>(null);
   // Document outline sidebar state
-  const [showOutline, setShowOutline] = useState(false);
+  const [showOutline, setShowOutline] = useState(showOutlineProp);
   const showOutlineRef = useRef(false);
   showOutlineRef.current = showOutline;
   const [outlineHeadings, setHeadingInfos] = useState<HeadingInfo[]>([]);
+
+  // Sync outline visibility when prop changes
+  useEffect(() => {
+    setShowOutline(showOutlineProp);
+    if (showOutlineProp) {
+      const view = pagedEditorRef.current?.getView();
+      if (view) {
+        setHeadingInfos(collectHeadings(view.state.doc));
+      }
+    }
+  }, [showOutlineProp]);
 
   // History hook for undo/redo - start with null document
   const history = useDocumentHistory<Document | null>(initialDocument || null, {
