@@ -61,6 +61,7 @@ import {
   type InlineHeaderFooterEditorRef,
 } from './InlineHeaderFooterEditor';
 import { FootnotePropertiesDialog } from './dialogs/FootnotePropertiesDialog';
+import { MaterialSymbol } from './ui/Icons';
 import { getBuiltinTableStyle, type TableStylePreset } from './ui/TableStyleGallery';
 import { DocumentAgent } from '../agent/DocumentAgent';
 import {
@@ -2098,12 +2099,14 @@ body { background: white; }
     display: 'flex',
     flex: 1,
     minHeight: 0, // Allow flex item to shrink below content size
+    minWidth: 0, // Allow flex item to shrink below content width on narrow viewports
     flexDirection: variablePanelPosition === 'left' ? 'row-reverse' : 'row',
   };
 
   const editorContainerStyle: CSSProperties = {
     flex: 1,
     minHeight: 0,
+    minWidth: 0, // Allow flex item to shrink below content width on narrow viewports
     overflow: 'auto', // This is the scroll container - sticky toolbar will stick to this
     position: 'relative',
   };
@@ -2172,6 +2175,7 @@ body { background: white; }
                 position: 'relative',
                 flex: 1,
                 minHeight: 0,
+                minWidth: 0,
                 display: 'flex',
                 flexDirection: 'column',
               }}
@@ -2397,12 +2401,11 @@ body { background: white; }
                     alignItems: 'center',
                   }}
                 >
-                  <span
-                    className="material-symbols-outlined"
-                    style={{ fontSize: 20, color: '#444746' }}
-                  >
-                    format_list_bulleted
-                  </span>
+                  <MaterialSymbol
+                    name="format_list_bulleted"
+                    size={20}
+                    style={{ color: '#444746' }}
+                  />
                 </button>
               )}
             </div>
