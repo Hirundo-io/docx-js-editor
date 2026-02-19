@@ -914,8 +914,6 @@ export function toFlowBlocks(doc: PMNode, options: ToFlowBlocksOptions = {}): Fl
               const marker = pmAttrs.listIsBullet ? '•' : formatNumberedMarker(counters, level);
               block.attrs = { ...block.attrs, listMarker: marker };
             }
-          } else {
-            listCounters.clear();
           }
 
           blocks.push(block);
@@ -924,13 +922,11 @@ export function toFlowBlocks(doc: PMNode, options: ToFlowBlocksOptions = {}): Fl
 
       case 'table':
         blocks.push(convertTable(node, pos, opts));
-        listCounters.clear();
         break;
 
       case 'image':
         // Standalone image block (if not inline)
         blocks.push(convertImage(node, pos, opts.pageContentHeight));
-        listCounters.clear();
         break;
 
       case 'horizontalRule':
@@ -942,7 +938,6 @@ export function toFlowBlocks(doc: PMNode, options: ToFlowBlocksOptions = {}): Fl
           pmEnd: pos + node.nodeSize,
         };
         blocks.push(pb);
-        listCounters.clear();
         break;
       }
     }
