@@ -27,7 +27,8 @@ coverage/
 playwright-report/
 test-results/
 
-# Ralph loop screenshots
+# Ralph loop artifacts
+.ralph/
 screenshots/
 
 # Environment
