@@ -18,6 +18,8 @@ import type {
   TableFormatting,
   TableRowFormatting,
   TableCellFormatting,
+  ParagraphPropertiesChange,
+  ParagraphMarkMoveRevision,
 } from '../../types/document';
 import type { FloatingTableProperties, TableLook } from '../../types';
 
@@ -98,6 +100,10 @@ export interface ParagraphAttrs {
   /** Original inline paragraph formatting from DOCX (pre-style-resolution).
    *  Used by fromProseDoc for lossless round-trip serialization. */
   _originalFormatting?: ParagraphFormatting;
+  /** Optional tracked paragraph-properties change (w:pPrChange). */
+  _paragraphPropertiesChange?: ParagraphPropertiesChange;
+  /** Optional paragraph-mark move markers from w:pPr/w:rPr. */
+  _paragraphMarkMoveRevisions?: ParagraphMarkMoveRevision[];
 }
 
 /**
