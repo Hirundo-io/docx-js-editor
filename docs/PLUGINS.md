@@ -6,3 +6,4 @@ The plugin documentation has moved to [`docs/plugins/`](./plugins/).
 - [EditorPlugin API](./plugins/editor-plugins.md) — browser-side UI plugins (panels, overlays, ProseMirror)
 - [CorePlugin & Headless API](./plugins/core-plugins.md) — server-side document manipulation, command handlers
 - [Examples & Cookbook](./plugins/examples.md) — advanced patterns and API recipes
+- [Review Plugin](../src/plugins/review/README.md) — tracked changes review rails and accept/reject actions
