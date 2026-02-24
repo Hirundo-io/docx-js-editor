@@ -1,9 +1,10 @@
-import type { Document, HeaderFooter } from '../types/document';
+import type { Document, HeaderFooter, Relationship } from '../types/document';
 import { buildTargetedDocumentXmlPatch } from './directXmlPlanBuilder';
 import { resolveRelativePath } from './relsParser';
 import { openDocxXml } from './rawXmlEditor';
 import type { RealDocChangeOperation } from './realDocumentChangeStrategy';
 import { serializeHeaderFooter } from './serializer/headerFooterSerializer';
+import { serializeEndnotes, serializeFootnotes } from './serializer/notesSerializer';
 import { serializeDocument } from './serializer/documentSerializer';
 
 export interface BuildDirectXmlOperationPlanContext {
@@ -53,6 +54,29 @@ function collectAllSectionRefs(
   );
 
   return refs;
+}
+
+const DOCUMENT_RELS_PATH = 'word/_rels/document.xml.rels';
+const DOCUMENT_PART_PATH = 'word/document.xml';
+const REL_TYPE_FOOTNOTES =
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes';
+const REL_TYPE_ENDNOTES =
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes';
+
+function findRelationshipByType(
+  relationships: Map<string, Relationship> | undefined,
+  relationshipType: string
+): { rId: string; relationship: Relationship } | null {
+  if (!relationships) return null;
+  for (const [rId, relationship] of relationships.entries()) {
+    if (relationship.type !== relationshipType) continue;
+    return { rId, relationship };
+  }
+  return null;
+}
+
+function toPartName(path: string): string {
+  return path.startsWith('/') ? path : `/${path}`;
 }
 
 export async function buildDirectXmlOperationPlan(
@@ -121,27 +145,29 @@ export async function buildDirectXmlOperationPlan(
   }
 
   const relationships = currentDocument.package.relationships;
-  if (!relationships) {
-    return finalize();
-  }
-
+  const baselineRelationships = baselineDocument.package.relationships;
   const seenParts = new Set<string>();
+  const removedParts = new Set<string>();
+  const removedRelationships = new Set<string>();
 
   const appendHeaderFooterOps = (
-    refs: { rId: string }[] | undefined,
-    map: Map<string, HeaderFooter> | undefined,
+    currentRefs: { rId: string }[] | undefined,
+    currentMap: Map<string, HeaderFooter> | undefined,
+    baselineRefs: { rId: string }[] | undefined,
     baselineMap: Map<string, HeaderFooter> | undefined
   ): void => {
-    if (!refs || !map) return;
+    const currentRefIds = new Set((currentRefs ?? []).map((ref) => ref.rId));
+    const currentPartPaths = new Set<string>();
 
-    for (const ref of refs) {
-      const relationship = relationships.get(ref.rId);
-      const headerFooter = map.get(ref.rId);
+    for (const ref of currentRefs ?? []) {
+      const relationship = relationships?.get(ref.rId);
+      const headerFooter = currentMap?.get(ref.rId);
       if (!relationship || !headerFooter || relationship.targetMode === 'External') {
         continue;
       }
 
-      const partPath = resolveRelativePath('word/_rels/document.xml.rels', relationship.target);
+      const partPath = resolveRelativePath(DOCUMENT_RELS_PATH, relationship.target);
+      currentPartPaths.add(partPath);
       if (seenParts.has(partPath)) {
         continue;
       }
@@ -162,17 +188,153 @@ export async function buildDirectXmlOperationPlan(
         xml: currentXml,
       });
     }
+
+    for (const baselineRef of baselineRefs ?? []) {
+      if (currentRefIds.has(baselineRef.rId)) continue;
+
+      const baselineRelationship = baselineRelationships?.get(baselineRef.rId);
+      if (!baselineRelationship || baselineRelationship.targetMode === 'External') {
+        continue;
+      }
+
+      if (!removedRelationships.has(baselineRef.rId)) {
+        removedRelationships.add(baselineRef.rId);
+        operations.push({
+          type: 'remove-relationship',
+          ownerPartPath: DOCUMENT_PART_PATH,
+          id: baselineRef.rId,
+          allowMissing: true,
+        });
+      }
+
+      const baselinePartPath = resolveRelativePath(DOCUMENT_RELS_PATH, baselineRelationship.target);
+      if (currentPartPaths.has(baselinePartPath) || removedParts.has(baselinePartPath)) {
+        continue;
+      }
+      removedParts.add(baselinePartPath);
+
+      operations.push({
+        type: 'remove-part',
+        path: baselinePartPath,
+      });
+      operations.push({
+        type: 'remove-content-type-override',
+        partName: toPartName(baselinePartPath),
+        allowMissing: true,
+      });
+    }
   };
+
+  if (!relationships && !baselineRelationships) {
+    return finalize();
+  }
 
   appendHeaderFooterOps(
     collectAllSectionRefs(currentDocument, 'header'),
     currentDocument.package.headers,
+    collectAllSectionRefs(baselineDocument, 'header'),
     baselineDocument.package.headers
   );
   appendHeaderFooterOps(
     collectAllSectionRefs(currentDocument, 'footer'),
     currentDocument.package.footers,
+    collectAllSectionRefs(baselineDocument, 'footer'),
     baselineDocument.package.footers
+  );
+
+  const appendNotesOps = (
+    relationshipType: string,
+    currentXml: string,
+    baselineXml: string
+  ): void => {
+    const currentRelationshipEntry = findRelationshipByType(relationships, relationshipType);
+    const baselineRelationshipEntry = findRelationshipByType(
+      baselineRelationships,
+      relationshipType
+    );
+
+    if (!currentRelationshipEntry) {
+      if (
+        !baselineRelationshipEntry ||
+        baselineRelationshipEntry.relationship.targetMode === 'External'
+      ) {
+        return;
+      }
+
+      if (!removedRelationships.has(baselineRelationshipEntry.rId)) {
+        removedRelationships.add(baselineRelationshipEntry.rId);
+        operations.push({
+          type: 'remove-relationship',
+          ownerPartPath: DOCUMENT_PART_PATH,
+          id: baselineRelationshipEntry.rId,
+          allowMissing: true,
+        });
+      }
+
+      const baselinePartPath = resolveRelativePath(
+        DOCUMENT_RELS_PATH,
+        baselineRelationshipEntry.relationship.target
+      );
+      if (removedParts.has(baselinePartPath)) {
+        return;
+      }
+      removedParts.add(baselinePartPath);
+
+      operations.push({
+        type: 'remove-part',
+        path: baselinePartPath,
+      });
+      operations.push({
+        type: 'remove-content-type-override',
+        partName: toPartName(baselinePartPath),
+        allowMissing: true,
+      });
+      return;
+    }
+
+    if (currentRelationshipEntry.relationship.targetMode === 'External') {
+      return;
+    }
+
+    const currentPartPath = resolveRelativePath(
+      DOCUMENT_RELS_PATH,
+      currentRelationshipEntry.relationship.target
+    );
+    if (seenParts.has(currentPartPath)) {
+      return;
+    }
+
+    if (baselineRelationshipEntry) {
+      if (baselineRelationshipEntry.relationship.targetMode === 'External') {
+        return;
+      }
+
+      const baselinePartPath = resolveRelativePath(
+        DOCUMENT_RELS_PATH,
+        baselineRelationshipEntry.relationship.target
+      );
+      if (baselinePartPath === currentPartPath && baselineXml === currentXml) {
+        return;
+      }
+    }
+
+    seenParts.add(currentPartPath);
+    operations.push({
+      type: 'set-xml',
+      path: currentPartPath,
+      xml: currentXml,
+    });
+  };
+
+  appendNotesOps(
+    REL_TYPE_FOOTNOTES,
+    serializeFootnotes(currentDocument.package.footnotes ?? []),
+    serializeFootnotes(baselineDocument.package.footnotes ?? [])
+  );
+  appendNotesOps(
+    REL_TYPE_ENDNOTES,
+    serializeEndnotes(currentDocument.package.endnotes ?? []),
+    serializeEndnotes(baselineDocument.package.endnotes ?? [])
   );
 
   return finalize();

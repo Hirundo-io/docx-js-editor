@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import type { RenderedDomContext } from '../../../plugin-api/types';
@@ -60,6 +60,50 @@ function parseIntSafe(value: string | undefined): number | null {
   if (!value) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isScrollableY(element: HTMLElement): boolean {
+  const style = window.getComputedStyle(element);
+  const overflowY = style.overflowY || style.overflow;
+  if (!/(auto|scroll|overlay)/.test(overflowY)) return false;
+  return element.scrollHeight > element.clientHeight + 1;
+}
+
+function findScrollRoot(start: HTMLElement): HTMLElement | null {
+  let current: HTMLElement | null = start;
+  while (current) {
+    if (isScrollableY(current)) return current;
+    current = current.parentElement;
+  }
+  return null;
+}
+
+function collectVisiblePageNumbers(
+  pagesContainer: HTMLElement,
+  scrollRoot: HTMLElement | null
+): Set<number> {
+  const pages = pagesContainer.querySelectorAll<HTMLElement>('.layout-page');
+  const visible = new Set<number>();
+  const rootTop = scrollRoot ? scrollRoot.getBoundingClientRect().top : 0;
+  const rootBottom = scrollRoot ? scrollRoot.getBoundingClientRect().bottom : window.innerHeight;
+
+  for (const page of pages) {
+    const pageNumber = parseIntSafe(page.dataset.pageNumber);
+    if (pageNumber === null) continue;
+    const rect = page.getBoundingClientRect();
+    if (rect.bottom > rootTop && rect.top < rootBottom) {
+      visible.add(pageNumber);
+    }
+  }
+
+  if (visible.size === 0) {
+    const fallbackFirst = parseIntSafe(pages[0]?.dataset.pageNumber);
+    if (fallbackFirst !== null) {
+      visible.add(fallbackFirst);
+    }
+  }
+
+  return visible;
 }
 
 function getPagePmRange(pageEl: HTMLElement): PmRange | null {
@@ -167,80 +211,95 @@ export function ReviewPageRailOverlay({
 }: ReviewPageRailOverlayProps) {
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [visiblePageNumbers, setVisiblePageNumbers] = useState<Set<number>>(new Set());
+  const pendingLayoutRefreshRafRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    const handleWindowResize = () => {
-      requestAnimationFrame(() => setLayoutVersion((current) => current + 1));
-    };
-    window.addEventListener('resize', handleWindowResize);
-    return () => window.removeEventListener('resize', handleWindowResize);
+  const requestLayoutRefresh = useCallback(() => {
+    if (pendingLayoutRefreshRafRef.current !== null) return;
+    pendingLayoutRefreshRafRef.current = requestAnimationFrame(() => {
+      pendingLayoutRefreshRafRef.current = null;
+      setLayoutVersion((current) => current + 1);
+    });
   }, []);
 
   useEffect(() => {
-    const resizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(() => setLayoutVersion((current) => current + 1));
-    });
+    return () => {
+      if (pendingLayoutRefreshRafRef.current !== null) {
+        cancelAnimationFrame(pendingLayoutRefreshRafRef.current);
+        pendingLayoutRefreshRafRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleWindowResize = () => requestLayoutRefresh();
+    window.addEventListener('resize', handleWindowResize);
+    return () => window.removeEventListener('resize', handleWindowResize);
+  }, [requestLayoutRefresh]);
+
+  useEffect(() => {
+    const resizeObserver = new ResizeObserver(() => requestLayoutRefresh());
     resizeObserver.observe(context.pagesContainer);
 
-    const mutationObserver = new MutationObserver(() => {
-      requestAnimationFrame(() => setLayoutVersion((current) => current + 1));
-    });
-    mutationObserver.observe(context.pagesContainer, { childList: true });
+    const mutationObserver = new MutationObserver(() => requestLayoutRefresh());
+    mutationObserver.observe(context.pagesContainer, { childList: true, subtree: true });
 
     return () => {
       resizeObserver.disconnect();
       mutationObserver.disconnect();
     };
-  }, [context.pagesContainer]);
+  }, [context.pagesContainer, requestLayoutRefresh]);
 
   useEffect(() => {
     const pages = context.pagesContainer.querySelectorAll<HTMLElement>('.layout-page');
-    const fallbackFirst = parseIntSafe(pages[0]?.dataset.pageNumber);
-    if (fallbackFirst !== null) {
-      setVisiblePageNumbers((prev) => {
-        if (prev.size > 0) return prev;
-        return new Set([fallbackFirst]);
+    const pagedEditor = context.pagesContainer.closest('.paged-editor');
+    const scrollRoot =
+      (pagedEditor instanceof HTMLElement ? findScrollRoot(pagedEditor) : null) ??
+      findScrollRoot(context.pagesContainer);
+
+    let pendingVisibleRefreshRaf: number | null = null;
+    const refreshVisiblePages = () => {
+      const next = collectVisiblePageNumbers(context.pagesContainer, scrollRoot);
+      setVisiblePageNumbers((previous) => (setsEqual(previous, next) ? previous : next));
+    };
+
+    const scheduleVisibleRefresh = () => {
+      if (pendingVisibleRefreshRaf !== null) return;
+      pendingVisibleRefreshRaf = requestAnimationFrame(() => {
+        pendingVisibleRefreshRaf = null;
+        refreshVisiblePages();
       });
-    }
+    };
 
-    const rootCandidate = context.pagesContainer.closest('.paged-editor');
-    const observer = new IntersectionObserver(
-      (entries) => {
-        setVisiblePageNumbers((previous) => {
-          const next = new Set(previous);
+    refreshVisiblePages();
 
-          for (const entry of entries) {
-            const pageEl = entry.target as HTMLElement;
-            const pageNumber = parseIntSafe(pageEl.dataset.pageNumber);
-            if (pageNumber === null) continue;
-
-            if (entry.isIntersecting) {
-              next.add(pageNumber);
-            } else {
-              next.delete(pageNumber);
-            }
-          }
-
-          return setsEqual(previous, next) ? previous : next;
-        });
-      },
-      {
-        root: rootCandidate instanceof HTMLElement ? rootCandidate : null,
-        threshold: 0.05,
-      }
-    );
+    const observer = new IntersectionObserver(() => scheduleVisibleRefresh(), {
+      root: scrollRoot,
+      threshold: 0.01,
+      rootMargin: '120px 0px 120px 0px',
+    });
 
     for (const page of pages) {
       observer.observe(page);
     }
 
-    return () => observer.disconnect();
+    const scrollTarget: EventTarget = scrollRoot ?? window;
+    const onScroll = () => scheduleVisibleRefresh();
+    scrollTarget.addEventListener('scroll', onScroll, { passive: true });
+
+    return () => {
+      observer.disconnect();
+      scrollTarget.removeEventListener('scroll', onScroll);
+      if (pendingVisibleRefreshRaf !== null) {
+        cancelAnimationFrame(pendingVisibleRefreshRaf);
+      }
+    };
   }, [context.pagesContainer, layoutVersion]);
 
-  const rails = useMemo(
-    () => createPageRails(context, pluginState.revisions, visiblePageNumbers, railWidth),
-    [context, pluginState.revisions, visiblePageNumbers, railWidth]
-  );
+  const rails = useMemo(() => {
+    // Force recomputation after virtualized page subtree mutations.
+    void layoutVersion;
+    return createPageRails(context, pluginState.revisions, visiblePageNumbers, railWidth);
+  }, [context, pluginState.revisions, visiblePageNumbers, railWidth, layoutVersion]);
 
   const selectRevision = useCallback(
     (revision: ReviewRevisionItem) => {
@@ -280,8 +339,12 @@ export function ReviewPageRailOverlay({
       }
 
       const coords = context.getCoordinatesForPosition(safeFrom);
-      const scrollContainer = context.pagesContainer.closest('.paged-editor');
-      if (!coords || !(scrollContainer instanceof HTMLElement)) return;
+      const pagedEditor = context.pagesContainer.closest('.paged-editor');
+      const scrollContainer =
+        (pagedEditor instanceof HTMLElement ? findScrollRoot(pagedEditor) : null) ??
+        findScrollRoot(context.pagesContainer) ??
+        (pagedEditor instanceof HTMLElement ? pagedEditor : null);
+      if (!coords || !scrollContainer) return;
 
       const containerOffset = context.getContainerOffset();
       const targetTop = (coords.y + containerOffset.y) * context.zoom;
