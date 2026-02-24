@@ -3,7 +3,8 @@
  */
 import React, { useState, useCallback, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import { DocxEditor } from './components/DocxEditor';
+import { DirectXmlDocxEditor as DocxEditor } from './components/DirectXmlDocxEditor';
+import { buildDirectXmlOperationPlan } from './docx/buildDirectXmlOperationPlan';
 import './index.css';
 
 /**
@@ -78,6 +79,8 @@ function App() {
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <DocxEditor
           documentBuffer={documentBuffer}
+          useDirectXmlSave={true}
+          buildDirectXmlOperations={buildDirectXmlOperationPlan}
           showToolbar={true}
           showVariablePanel={true}
           showZoomControl={true}

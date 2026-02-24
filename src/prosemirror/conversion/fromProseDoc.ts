@@ -42,6 +42,7 @@ import type {
   InlineSdt,
   SdtProperties,
   TrackedChangeInfo,
+  MoveRangeInfo,
   MathEquation,
 } from '../../types/document';
 import type {
@@ -147,6 +148,8 @@ function convertPMParagraph(node: PMNode): Paragraph {
     paraId: attrs.paraId || undefined,
     textId: attrs.textId || undefined,
     formatting: paragraphAttrsToFormatting(attrs),
+    paragraphPropertiesChange: attrs._paragraphPropertiesChange || undefined,
+    paragraphMarkMoveRevisions: attrs._paragraphMarkMoveRevisions || undefined,
     content,
   };
 
@@ -343,10 +346,15 @@ function extractParagraphContent(paragraph: PMNode): ParagraphContent[] {
       return;
     }
 
-    // Check for tracked change marks (insertion/deletion)
+    // Check for tracked change marks (insertion/deletion/move)
     const insertionMark = node.marks.find((m) => m.type.name === 'insertion');
     const deletionMark = node.marks.find((m) => m.type.name === 'deletion');
-    if (insertionMark || deletionMark) {
+    const moveFromMark = node.marks.find((m) => m.type.name === 'moveFrom');
+    const moveToMark = node.marks.find((m) => m.type.name === 'moveTo');
+    const changeMark = insertionMark || deletionMark || moveFromMark || moveToMark;
+    const hyperlinkMark = node.marks.find((m) => m.type.name === 'hyperlink');
+
+    if (changeMark) {
       // Finish any current content
       if (currentRun) {
         content.push(currentRun);
@@ -358,17 +366,27 @@ function extractParagraphContent(paragraph: PMNode): ParagraphContent[] {
         currentHyperlink = null;
       }
 
-      const changeMark = (insertionMark || deletionMark)!;
       // Filter out the tracked change mark for text formatting extraction
       const otherMarks = node.marks.filter(
-        (m) => m.type.name !== 'insertion' && m.type.name !== 'deletion'
+        (m) =>
+          m.type.name !== 'insertion' &&
+          m.type.name !== 'deletion' &&
+          m.type.name !== 'moveFrom' &&
+          m.type.name !== 'moveTo' &&
+          m.type.name !== 'hyperlink'
       );
-      const formatting = marksToTextFormatting(otherMarks);
-      const run: Run = {
-        type: 'run',
-        content: node.isText && node.text ? [{ type: 'text', text: node.text }] : [],
-        ...(Object.keys(formatting).length > 0 ? { formatting } : {}),
-      };
+      const run = createTrackedChangeRunFromNode(node, otherMarks);
+      if (!run) {
+        return;
+      }
+
+      const trackedItem: Run | Hyperlink = hyperlinkMark
+        ? (() => {
+            const hyperlink = createHyperlink(hyperlinkMark);
+            hyperlink.children.push(run);
+            return hyperlink;
+          })()
+        : run;
 
       const info: TrackedChangeInfo = {
         id: changeMark.attrs.revisionId as number,
@@ -376,10 +394,29 @@ function extractParagraphContent(paragraph: PMNode): ParagraphContent[] {
         date: (changeMark.attrs.date as string) || undefined,
       };
 
+      let range: MoveRangeInfo | undefined;
+      const rangeIdRaw = changeMark.attrs.rangeId;
+      const rangeId =
+        rangeIdRaw === null || rangeIdRaw === undefined || rangeIdRaw === ''
+          ? undefined
+          : Number(rangeIdRaw);
+      if (rangeId !== undefined && Number.isFinite(rangeId)) {
+        range = {
+          id: rangeId,
+          name: (changeMark.attrs.rangeName as string) || undefined,
+          author: (changeMark.attrs.rangeAuthor as string) || undefined,
+          date: (changeMark.attrs.rangeDate as string) || undefined,
+        };
+      }
+
       if (insertionMark) {
-        content.push({ type: 'insertion', info, content: [run] });
+        content.push({ type: 'insertion', info, content: [trackedItem] });
+      } else if (deletionMark) {
+        content.push({ type: 'deletion', info, content: [trackedItem] });
+      } else if (moveFromMark) {
+        content.push({ type: 'moveFrom', info, range, content: [trackedItem] });
       } else {
-        content.push({ type: 'deletion', info, content: [run] });
+        content.push({ type: 'moveTo', info, range, content: [trackedItem] });
       }
       return;
     }
@@ -574,6 +611,35 @@ function createRunFromText(text: string, marks: readonly Mark[]): Run {
     formatting: Object.keys(formatting).length > 0 ? formatting : undefined,
     content: [textContent],
   };
+}
+
+function createTrackedChangeRunFromNode(node: PMNode, marks: readonly Mark[]): Run | null {
+  const formatting = marksToTextFormatting(marks);
+  const hasFormatting = Object.keys(formatting).length > 0;
+
+  if (node.isText) {
+    return createRunFromText(node.text || '', marks);
+  }
+
+  let run: Run | null = null;
+  if (node.type.name === 'hardBreak') {
+    run = createBreakRun();
+  } else if (node.type.name === 'tab') {
+    run = createTabRun();
+  } else if (node.type.name === 'image') {
+    run = createImageRun(node);
+  } else if (node.type.name === 'shape') {
+    run = createShapeRun(node);
+  }
+
+  if (!run) {
+    return null;
+  }
+
+  if (hasFormatting) {
+    run.formatting = { ...(run.formatting || {}), ...formatting };
+  }
+  return run;
 }
 
 /**

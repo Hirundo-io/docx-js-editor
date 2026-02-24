@@ -1,12 +1,48 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  DocxEditor,
+  DirectXmlDocxEditor as DocxEditor,
   type DocxEditorRef,
+  PluginHost,
   createEmptyDocument,
+  reviewPlugin,
   type Document,
 } from '@eigenpal/docx-js-editor';
 import { ExampleSwitcher } from '../../shared/ExampleSwitcher';
 import { GitHubBadge } from '../../shared/GitHubBadge';
+import {
+  buildDirectXmlOperationPlan as buildDirectXmlOperationPlanShared,
+  type DirectXmlOperationPlanDiagnostics,
+} from '@/docx/buildDirectXmlOperationPlan';
+
+type UiSaveTrace = {
+  phase: 'plan' | 'save-result' | 'save-error';
+  timestamp: string;
+  fileName: string;
+  editedParagraphIdsCount?: number;
+  editedParagraphIdsSample?: string[];
+  targetedPatchUsed?: boolean;
+  targetedPatchChangedParagraphs?: number | null;
+  fallbackReason?: string | null;
+  operationCount?: number;
+  operationPaths?: string[];
+  savedBytes?: number;
+  error?: string;
+};
+
+declare global {
+  interface Window {
+    __DOCX_UI_SAVE_TRACE__?: UiSaveTrace[];
+  }
+}
+
+function pushUiSaveTrace(trace: UiSaveTrace): void {
+  if (typeof window === 'undefined') return;
+
+  const traces = window.__DOCX_UI_SAVE_TRACE__ ?? [];
+  traces.push(trace);
+  window.__DOCX_UI_SAVE_TRACE__ = traces;
+  console.info('[docx-ui-save-trace]', trace);
+}
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
@@ -328,6 +364,44 @@ export function App() {
     }
   }, []);
 
+  const buildDirectXmlOperationPlan = useCallback(
+    async (context: {
+      currentDocument: Document;
+      baselineDocument: Document;
+      editedParagraphIds?: string[];
+    }) => {
+      let planDiagnostics: DirectXmlOperationPlanDiagnostics = {
+        targetedPatchUsed: false,
+        targetedPatchChangedParagraphs: null,
+        fallbackReason: null,
+        operationCount: 0,
+        operationPaths: [],
+      };
+
+      const operations = await buildDirectXmlOperationPlanShared(context, {
+        onDiagnostics: (next) => {
+          planDiagnostics = next;
+        },
+      });
+
+      pushUiSaveTrace({
+        phase: 'plan',
+        timestamp: new Date().toISOString(),
+        fileName,
+        editedParagraphIdsCount: context.editedParagraphIds?.length ?? 0,
+        editedParagraphIdsSample: (context.editedParagraphIds ?? []).slice(0, 20),
+        targetedPatchUsed: planDiagnostics.targetedPatchUsed,
+        targetedPatchChangedParagraphs: planDiagnostics.targetedPatchChangedParagraphs,
+        fallbackReason: planDiagnostics.fallbackReason,
+        operationCount: planDiagnostics.operationCount,
+        operationPaths: planDiagnostics.operationPaths,
+      });
+
+      return operations;
+    },
+    [fileName]
+  );
+
   const handleSave = useCallback(async () => {
     if (!editorRef.current) return;
 
@@ -335,6 +409,13 @@ export function App() {
       setStatus('Saving...');
       const buffer = await editorRef.current.save();
       if (buffer) {
+        pushUiSaveTrace({
+          phase: 'save-result',
+          timestamp: new Date().toISOString(),
+          fileName,
+          savedBytes: buffer.byteLength,
+        });
+
         const blob = new Blob([buffer], {
           type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         });
@@ -349,7 +430,13 @@ export function App() {
         setStatus('Saved!');
         setTimeout(() => setStatus(''), 2000);
       }
-    } catch {
+    } catch (error) {
+      pushUiSaveTrace({
+        phase: 'save-error',
+        timestamp: new Date().toISOString(),
+        fileName,
+        error: error instanceof Error ? error.message : 'unknown error',
+      });
       setStatus('Save failed');
     }
   }, [fileName]);
@@ -416,21 +503,25 @@ export function App() {
       )}
 
       <main style={styles.main}>
-        <DocxEditor
-          ref={editorRef}
-          document={documentBuffer ? undefined : currentDocument}
-          documentBuffer={documentBuffer}
-          onChange={handleDocumentChange}
-          onError={handleError}
-          onFontsLoaded={handleFontsLoaded}
-          showToolbar={true}
-          showRuler={!isMobile}
-          showVariablePanel={true}
-          showZoomControl={true}
-          showPageNumbers={false}
-          initialZoom={autoZoom}
-          variablePanelPosition="right"
-        />
+        <PluginHost plugins={[reviewPlugin]}>
+          <DocxEditor
+            ref={editorRef}
+            document={documentBuffer ? undefined : currentDocument}
+            documentBuffer={documentBuffer}
+            useDirectXmlSave={true}
+            buildDirectXmlOperations={buildDirectXmlOperationPlan}
+            onChange={handleDocumentChange}
+            onError={handleError}
+            onFontsLoaded={handleFontsLoaded}
+            showToolbar={true}
+            showRuler={!isMobile}
+            showVariablePanel={true}
+            showZoomControl={true}
+            showPageNumbers={false}
+            initialZoom={autoZoom}
+            variablePanelPosition="right"
+          />
+        </PluginHost>
       </main>
     </div>
   );

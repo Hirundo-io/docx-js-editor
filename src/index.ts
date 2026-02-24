@@ -16,7 +16,7 @@
  * CSS Styles:
  * For optimal cursor visibility and selection highlighting, import the editor styles:
  * ```
- * import '@eigenpal/docx-js-editor/styles/editor.css';
+ * import '@eigenpal/docx-js-editor/styles.css';
  * ```
  */
 
@@ -24,13 +24,18 @@
 // VERSION
 // ============================================================================
 
-export const VERSION = '0.0.2';
+export const VERSION = '0.0.8';
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
 export { DocxEditor, type DocxEditorProps, type DocxEditorRef } from './components/DocxEditor';
+export {
+  DirectXmlDocxEditor,
+  type DirectXmlDocxEditorProps,
+  type DirectXmlOperationContext,
+} from './components/DirectXmlDocxEditor';
 export { renderAsync, type RenderAsyncOptions, type DocxEditorHandle } from './renderAsync';
 export { type DocxInput, toArrayBuffer } from './utils/docxInput';
 
@@ -58,6 +63,33 @@ export {
   serializeDocumentBody,
   serializeSectionProperties,
 } from './docx/serializer/documentSerializer';
+export {
+  DocxXmlEditor,
+  openDocxXml,
+  editDocxXml,
+  type DocxPartInfo,
+  type DocxXmlSaveOptions,
+  type DocxXmlMutator,
+} from './docx/rawXmlEditor';
+export {
+  applyRealDocChanges,
+  type XmlReplaceOccurrence,
+  type ReplaceXmlTextOperation,
+  type SetXmlOperation,
+  type SetTextOperation,
+  type SetBinaryOperation,
+  type RemovePartOperation,
+  type UpsertRelationshipOperation,
+  type RemoveRelationshipOperation,
+  type EnsureContentTypeOverrideOperation,
+  type RemoveContentTypeOverrideOperation,
+  type EnsureContentTypeDefaultOperation,
+  type RemoveContentTypeDefaultOperation,
+  type RealDocChangeOperation,
+  type ApplyRealDocChangesOptions,
+  type RealDocChangeReportItem,
+  type ApplyRealDocChangesResult,
+} from './docx/realDocumentChangeStrategy';
 export {
   processTemplate,
   processTemplateDetailed,
@@ -726,6 +758,35 @@ export {
   type TemplateTag,
   type TagType,
 } from './plugins/template';
+
+// Review Plugin (tracked changes review workflow)
+export {
+  reviewPlugin,
+  createReviewPlugin,
+  RevisionPanel,
+  REVIEW_PANEL_STYLES,
+  extractRevisionsFromDoc,
+  findActiveRevisionId,
+  createReviewPluginState,
+  canApplyBodyModelRevisionDecision,
+  canApplyBulkBodyModelRevisionDecision,
+  canApplyHeaderFooterRevisionDecision,
+  canApplyBulkHeaderFooterRevisionDecision,
+  applyBodyModelRevisionDecisionToDocument,
+  applyBulkBodyModelRevisionDecisionToDocument,
+  applyHeaderFooterRevisionDecisionToDocument,
+  applyBulkHeaderFooterRevisionDecisionToDocument,
+  createRevisionDecisionTransaction,
+  createBulkRevisionDecisionTransaction,
+  applyRevisionDecision,
+  applyBulkRevisionDecision,
+  type ReviewPluginOptions,
+  type ReviewDecision,
+  type ReviewPluginState,
+  type ReviewRevisionItem,
+  type ReviewRevisionStatus,
+  type ReviewRevisionType,
+} from './plugins/review';
 
 // ============================================================================
 // CORE PLUGIN SYSTEM

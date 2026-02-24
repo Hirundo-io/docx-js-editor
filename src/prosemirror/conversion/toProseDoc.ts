@@ -37,6 +37,8 @@ import type {
   InlineSdt,
   Insertion,
   Deletion,
+  MoveFrom,
+  MoveTo,
   MathEquation,
 } from '../../types/document';
 import { emuToPixels } from '../../docx/imageParser';
@@ -161,6 +163,22 @@ function convertParagraph(
         styleResolver
       );
       inlineNodes.push(...delNodes);
+    } else if (content.type === 'moveFrom') {
+      const moveFromNodes = convertTrackedChange(
+        content,
+        'moveFrom',
+        mergedStyleRunFormatting,
+        styleResolver
+      );
+      inlineNodes.push(...moveFromNodes);
+    } else if (content.type === 'moveTo') {
+      const moveToNodes = convertTrackedChange(
+        content,
+        'moveTo',
+        mergedStyleRunFormatting,
+        styleResolver
+      );
+      inlineNodes.push(...moveToNodes);
     } else if (content.type === 'mathEquation') {
       const mathNode = convertMathEquation(content);
       if (mathNode) inlineNodes.push(mathNode);
@@ -201,8 +219,8 @@ function applyCommentMarks(nodes: PMNode[], commentIds: Set<number>): PMNode[] {
  * an insertion/deletion mark applied.
  */
 function convertTrackedChange(
-  change: Insertion | Deletion,
-  markType: 'insertion' | 'deletion',
+  change: Insertion | Deletion | MoveFrom | MoveTo,
+  changeMarkType: 'insertion' | 'deletion' | 'moveFrom' | 'moveTo',
   styleRunFormatting?: TextFormatting,
   styleResolver?: StyleResolver | null
 ): PMNode[] {
@@ -215,14 +233,23 @@ function convertTrackedChange(
     }
   }
 
-  const mark = schema.marks[markType].create({
+  const markAttrs: Record<string, unknown> = {
     revisionId: change.info.id,
     author: change.info.author,
     date: change.info.date ?? null,
-  });
+  };
+
+  if (change.type === 'moveFrom' || change.type === 'moveTo') {
+    markAttrs.rangeId = change.range?.id ?? null;
+    markAttrs.rangeName = change.range?.name ?? null;
+    markAttrs.rangeAuthor = change.range?.author ?? null;
+    markAttrs.rangeDate = change.range?.date ?? null;
+  }
+
+  const mark = schema.marks[changeMarkType].create(markAttrs);
 
   return nodes.map((node) => {
-    if (node.isText) {
+    if (node.isInline) {
       return node.mark(mark.addToSet(node.marks));
     }
     return node;
@@ -254,6 +281,8 @@ function paragraphFormattingToAttrs(
     listMarker: paragraph.listRendering?.marker,
     // Store original inline formatting for lossless serialization round-trip
     _originalFormatting: formatting || undefined,
+    _paragraphPropertiesChange: paragraph.paragraphPropertiesChange ?? undefined,
+    _paragraphMarkMoveRevisions: paragraph.paragraphMarkMoveRevisions ?? undefined,
   };
 
   // If we have a style resolver, resolve the style and get base properties
