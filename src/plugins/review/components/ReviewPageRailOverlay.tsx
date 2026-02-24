@@ -3,11 +3,9 @@ import { TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import type { RenderedDomContext } from '../../../plugin-api/types';
 import {
-  applyBodyModelRevisionDecisionToDocument,
-  applyHeaderFooterRevisionDecisionToDocument,
-  applyRevisionDecision,
   canApplyBodyModelRevisionDecision,
   canApplyHeaderFooterRevisionDecision,
+  runRevisionDecision,
 } from '../actions';
 import { formatRevisionDate, revisionTypeLabel } from '../utils/revisionPresentation';
 import type { ReviewDecision, ReviewPluginState, ReviewRevisionItem } from '../types';
@@ -362,34 +360,13 @@ export function ReviewPageRailOverlay({
     (revision: ReviewRevisionItem, decision: ReviewDecision) => {
       if (!editorView) return;
       if (revision.status !== 'supported') return;
-
-      if (revision.location === 'body') {
-        if (applyRevisionDecision(editorView, pluginState.revisions, revision.id, decision)) {
-          return;
-        }
-        if (!pluginState.mutateDocumentModel) return;
-        if (!canApplyBodyModelRevisionDecision(pluginState.revisions, revision.id)) return;
-        pluginState.mutateDocumentModel((document) =>
-          applyBodyModelRevisionDecisionToDocument(
-            document,
-            pluginState.revisions,
-            revision.id,
-            decision
-          )
-        );
-        return;
-      }
-
-      if (!pluginState.mutateDocumentModel) return;
-      if (!canApplyHeaderFooterRevisionDecision(pluginState.revisions, revision.id)) return;
-      pluginState.mutateDocumentModel((document) =>
-        applyHeaderFooterRevisionDecisionToDocument(
-          document,
-          pluginState.revisions,
-          revision.id,
-          decision
-        )
-      );
+      runRevisionDecision({
+        editorView,
+        revisions: pluginState.revisions,
+        revisionId: revision.id,
+        decision,
+        mutateDocumentModel: pluginState.mutateDocumentModel,
+      });
     },
     [editorView, pluginState]
   );

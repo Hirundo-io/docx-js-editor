@@ -741,6 +741,57 @@ export function applyRevisionDecision(
   return true;
 }
 
+export interface RunRevisionDecisionOptions {
+  editorView: EditorView | null;
+  revisions: readonly ReviewRevisionItem[];
+  revisionId: string;
+  decision: ReviewDecision;
+  mutateDocumentModel?: (updater: (document: Document) => Document | null) => boolean;
+}
+
+/**
+ * Apply one revision decision with a unified strategy used across review UIs:
+ * try PM transaction first for body mark revisions, then fall back to document-model
+ * mutations for body model changes and header/footer revisions.
+ */
+export function runRevisionDecision({
+  editorView,
+  revisions,
+  revisionId,
+  decision,
+  mutateDocumentModel,
+}: RunRevisionDecisionOptions): boolean {
+  const revision = findRevisionById(revisions, revisionId);
+  if (!revision || revision.status !== 'supported') return false;
+
+  if (revision.location === 'body') {
+    if (editorView) {
+      const tr = createRevisionDecisionTransaction(
+        editorView.state,
+        revisions,
+        revisionId,
+        decision
+      );
+      if (tr) {
+        editorView.dispatch(tr);
+        return true;
+      }
+    }
+
+    if (!mutateDocumentModel) return false;
+    if (!canApplyBodyModelRevisionDecision(revisions, revisionId)) return false;
+    return mutateDocumentModel((document) =>
+      applyBodyModelRevisionDecisionToDocument(document, revisions, revisionId, decision)
+    );
+  }
+
+  if (!mutateDocumentModel) return false;
+  if (!canApplyHeaderFooterRevisionDecision(revisions, revisionId)) return false;
+  return mutateDocumentModel((document) =>
+    applyHeaderFooterRevisionDecisionToDocument(document, revisions, revisionId, decision)
+  );
+}
+
 export function applyBulkRevisionDecision(
   view: EditorView,
   revisions: readonly ReviewRevisionItem[],
