@@ -9,12 +9,8 @@ import {
   canApplyBodyModelRevisionDecision,
   canApplyHeaderFooterRevisionDecision,
 } from '../actions';
-import type {
-  ReviewDecision,
-  ReviewPluginState,
-  ReviewRevisionItem,
-  ReviewRevisionType,
-} from '../types';
+import { formatRevisionDate, revisionTypeLabel } from '../utils/revisionPresentation';
+import type { ReviewDecision, ReviewPluginState, ReviewRevisionItem } from '../types';
 
 interface ReviewPageRailOverlayProps {
   context: RenderedDomContext;
@@ -42,21 +38,6 @@ const RAIL_GAP = 10;
 const VISIBLE_PAGE_BUFFER = 1;
 const MAX_REVISIONS_PER_PAGE_RAIL = 300;
 
-function revisionTypeLabel(type: ReviewRevisionType): string {
-  switch (type) {
-    case 'insertion':
-      return 'Insertion';
-    case 'deletion':
-      return 'Deletion';
-    case 'moveFrom':
-      return 'Move From';
-    case 'moveTo':
-      return 'Move To';
-    case 'formatChange':
-      return 'Formatting';
-  }
-}
-
 function revisionLocationLabel(revision: ReviewRevisionItem): string {
   if (revision.location === 'header') {
     const ref = revision.headerFooterRefType ? ` (${revision.headerFooterRefType})` : '';
@@ -67,13 +48,6 @@ function revisionLocationLabel(revision: ReviewRevisionItem): string {
     return `Footer${ref}`;
   }
   return 'Body';
-}
-
-function formatRevisionDate(date: string | null): string {
-  if (!date) return 'Unknown date';
-  const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) return date;
-  return parsed.toLocaleString();
 }
 
 function setsEqual(a: ReadonlySet<number>, b: ReadonlySet<number>): boolean {
