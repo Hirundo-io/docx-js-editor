@@ -14,12 +14,8 @@ import {
   createBulkRevisionDecisionTransaction,
   createRevisionDecisionTransaction,
 } from '../actions';
-import type {
-  ReviewDecision,
-  ReviewPluginState,
-  ReviewRevisionItem,
-  ReviewRevisionType,
-} from '../types';
+import { formatRevisionDate, revisionTypeLabel } from '../utils/revisionPresentation';
+import type { ReviewDecision, ReviewPluginState, ReviewRevisionItem } from '../types';
 
 type RevisionFilter =
   | 'all'
@@ -44,28 +40,6 @@ const FILTERS: ReadonlyArray<{ key: RevisionFilter; label: string }> = [
   { key: 'moveTo', label: 'Move To' },
   { key: 'formatChange', label: 'Formatting' },
 ];
-
-function revisionTypeLabel(type: ReviewRevisionType): string {
-  switch (type) {
-    case 'insertion':
-      return 'Insertion';
-    case 'deletion':
-      return 'Deletion';
-    case 'moveFrom':
-      return 'Move From';
-    case 'moveTo':
-      return 'Move To';
-    case 'formatChange':
-      return 'Formatting';
-  }
-}
-
-function formatRevisionDate(date: string | null): string {
-  if (!date) return 'Unknown date';
-  const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) return date;
-  return parsed.toLocaleString();
-}
 
 function filterRevisions(
   revisions: readonly ReviewRevisionItem[],

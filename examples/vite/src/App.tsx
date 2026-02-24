@@ -6,16 +6,13 @@ import {
   createEmptyDocument,
   reviewPlugin,
   type Document,
-  type HeaderFooter,
 } from '@eigenpal/docx-js-editor';
 import { ExampleSwitcher } from '../../shared/ExampleSwitcher';
 import { GitHubBadge } from '../../shared/GitHubBadge';
-import { serializeDocument } from '@/docx/serializer/documentSerializer';
-import { serializeHeaderFooter } from '@/docx/serializer/headerFooterSerializer';
-import { openDocxXml } from '@/docx/rawXmlEditor';
-import { resolveRelativePath } from '@/docx/relsParser';
-import { buildTargetedDocumentXmlPatch } from '@/docx/directXmlPlanBuilder';
-import type { RealDocChangeOperation } from '@/docx/realDocumentChangeStrategy';
+import {
+  buildDirectXmlOperationPlan as buildDirectXmlOperationPlanShared,
+  type DirectXmlOperationPlanDiagnostics,
+} from '@/docx/buildDirectXmlOperationPlan';
 
 type UiSaveTrace = {
   phase: 'plan' | 'save-result' | 'save-error';
@@ -372,155 +369,32 @@ export function App() {
       currentDocument: Document;
       baselineDocument: Document;
       editedParagraphIds?: string[];
-    }): Promise<RealDocChangeOperation[]> => {
-      const { currentDocument, baselineDocument, editedParagraphIds } = context;
-      const operations: RealDocChangeOperation[] = [];
+    }) => {
+      let planDiagnostics: DirectXmlOperationPlanDiagnostics = {
+        targetedPatchUsed: false,
+        targetedPatchChangedParagraphs: null,
+        fallbackReason: null,
+        operationCount: 0,
+        operationPaths: [],
+      };
 
-      let targetedPatchUsed = false;
-      let targetedPatchChangedParagraphs: number | null = null;
-      let fallbackReason: string | null = null;
-
-      const currentDocumentXml = serializeDocument(currentDocument);
-      const baselineDocumentXml = serializeDocument(baselineDocument);
-      if (currentDocumentXml !== baselineDocumentXml) {
-        let documentXmlForSave = currentDocumentXml;
-
-        const originalBuffer = baselineDocument.originalBuffer;
-        if (originalBuffer) {
-          try {
-            const rawEditor = await openDocxXml(originalBuffer.slice(0));
-            const rawBaselineDocumentXml = await rawEditor.getXml('word/document.xml');
-            const targetedPatch = buildTargetedDocumentXmlPatch({
-              baselineDocument,
-              currentDocument,
-              baselineDocumentXml: rawBaselineDocumentXml,
-              candidateParagraphIds: editedParagraphIds,
-            });
-            if (targetedPatch) {
-              targetedPatchUsed = true;
-              targetedPatchChangedParagraphs = targetedPatch.changedParagraphIds.length;
-              documentXmlForSave = targetedPatch.xml;
-            } else {
-              fallbackReason = 'targeted-patch-returned-null';
-            }
-          } catch (error) {
-            fallbackReason =
-              error instanceof Error
-                ? `targeted-patch-error:${error.message}`
-                : 'targeted-patch-error:unknown';
-            console.warn(
-              'Failed to build targeted document.xml patch, falling back to full document.xml serialization',
-              error
-            );
-          }
-        } else {
-          fallbackReason = 'missing-original-buffer';
-        }
-
-        operations.push({
-          type: 'set-xml',
-          path: 'word/document.xml',
-          xml: documentXmlForSave,
-        });
-      }
-
-      const relationships = currentDocument.package.relationships;
-      if (relationships) {
-        const seenParts = new Set<string>();
-
-        const appendHeaderFooterOps = (
-          refs: { rId: string }[] | undefined,
-          map: Map<string, HeaderFooter> | undefined,
-          baselineMap: Map<string, HeaderFooter> | undefined
-        ): void => {
-          if (!refs || !map) return;
-
-          for (const ref of refs) {
-            const relationship = relationships.get(ref.rId);
-            const headerFooter = map.get(ref.rId);
-            if (!relationship || !headerFooter || relationship.targetMode === 'External') {
-              continue;
-            }
-
-            const partPath = resolveRelativePath(
-              'word/_rels/document.xml.rels',
-              relationship.target
-            );
-            if (seenParts.has(partPath)) {
-              continue;
-            }
-            seenParts.add(partPath);
-
-            const currentXml = serializeHeaderFooter(headerFooter);
-            const baselineHeaderFooter = baselineMap?.get(ref.rId);
-            if (baselineHeaderFooter) {
-              const baselineXml = serializeHeaderFooter(baselineHeaderFooter);
-              if (currentXml === baselineXml) {
-                continue;
-              }
-            }
-
-            operations.push({
-              type: 'set-xml',
-              path: partPath,
-              xml: currentXml,
-            });
-          }
-        };
-
-        const collectAllSectionRefs = (kind: 'header' | 'footer'): Array<{ rId: string }> => {
-          const refs: Array<{ rId: string }> = [];
-          const seenRels = new Set<string>();
-          const append = (items: Array<{ rId: string }> | undefined) => {
-            if (!items) return;
-            for (const item of items) {
-              if (seenRels.has(item.rId)) continue;
-              seenRels.add(item.rId);
-              refs.push(item);
-            }
-          };
-
-          for (const section of currentDocument.package.document.sections ?? []) {
-            append(
-              kind === 'header'
-                ? section.properties.headerReferences
-                : section.properties.footerReferences
-            );
-          }
-
-          const finalSectionProperties = currentDocument.package.document.finalSectionProperties;
-          append(
-            kind === 'header'
-              ? finalSectionProperties?.headerReferences
-              : finalSectionProperties?.footerReferences
-          );
-
-          return refs;
-        };
-
-        appendHeaderFooterOps(
-          collectAllSectionRefs('header'),
-          currentDocument.package.headers,
-          baselineDocument.package.headers
-        );
-        appendHeaderFooterOps(
-          collectAllSectionRefs('footer'),
-          currentDocument.package.footers,
-          baselineDocument.package.footers
-        );
-      }
+      const operations = await buildDirectXmlOperationPlanShared(context, {
+        onDiagnostics: (next) => {
+          planDiagnostics = next;
+        },
+      });
 
       pushUiSaveTrace({
         phase: 'plan',
         timestamp: new Date().toISOString(),
         fileName,
-        editedParagraphIdsCount: editedParagraphIds?.length ?? 0,
-        editedParagraphIdsSample: (editedParagraphIds ?? []).slice(0, 20),
-        targetedPatchUsed,
-        targetedPatchChangedParagraphs,
-        fallbackReason,
-        operationCount: operations.length,
-        operationPaths: operations.map((op) => ('path' in op ? op.path : 'n/a')),
+        editedParagraphIdsCount: context.editedParagraphIds?.length ?? 0,
+        editedParagraphIdsSample: (context.editedParagraphIds ?? []).slice(0, 20),
+        targetedPatchUsed: planDiagnostics.targetedPatchUsed,
+        targetedPatchChangedParagraphs: planDiagnostics.targetedPatchChangedParagraphs,
+        fallbackReason: planDiagnostics.fallbackReason,
+        operationCount: planDiagnostics.operationCount,
+        operationPaths: planDiagnostics.operationPaths,
       });
 
       return operations;
