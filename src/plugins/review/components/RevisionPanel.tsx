@@ -1,18 +1,16 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { PluginPanelProps } from '../../../plugin-api/types';
 import {
-  applyBodyModelRevisionDecisionToDocument,
   applyBulkBodyModelRevisionDecisionToDocument,
   applyBulkHeaderFooterRevisionDecisionToDocument,
   applyBulkRevisionDecision,
-  applyHeaderFooterRevisionDecisionToDocument,
-  applyRevisionDecision,
   canApplyBodyModelRevisionDecision,
   canApplyBulkBodyModelRevisionDecision,
   canApplyBulkHeaderFooterRevisionDecision,
   canApplyHeaderFooterRevisionDecision,
   createBulkRevisionDecisionTransaction,
   createRevisionDecisionTransaction,
+  runRevisionDecision,
 } from '../actions';
 import { formatRevisionDate, revisionTypeLabel } from '../utils/revisionPresentation';
 import type { ReviewDecision, ReviewPluginState, ReviewRevisionItem } from '../types';
@@ -70,12 +68,22 @@ export function RevisionPanel({
   scrollToPosition,
 }: RevisionPanelProps) {
   const [filter, setFilter] = useState<RevisionFilter>('all');
+  const [selectedNonBodyRevisionId, setSelectedNonBodyRevisionId] = useState<string | null>(null);
   const revisions = pluginState?.revisions ?? EMPTY_REVISIONS;
-  const activeRevisionId = pluginState?.activeRevisionId ?? null;
+  const mutateDocumentModel = pluginState?.mutateDocumentModel;
+  const activeRevisionId = selectedNonBodyRevisionId ?? pluginState?.activeRevisionId ?? null;
   const activeRevision = useMemo(
     () => revisions.find((revision) => revision.id === activeRevisionId) ?? null,
     [revisions, activeRevisionId]
   );
+
+  useEffect(() => {
+    if (!selectedNonBodyRevisionId) return;
+    const stillExists = revisions.some((revision) => revision.id === selectedNonBodyRevisionId);
+    if (!stillExists) {
+      setSelectedNonBodyRevisionId(null);
+    }
+  }, [revisions, selectedNonBodyRevisionId]);
 
   const filteredRevisions = useMemo(() => filterRevisions(revisions, filter), [revisions, filter]);
   const renderedRevisions = useMemo(
@@ -87,8 +95,10 @@ export function RevisionPanel({
   const selectRevision = useCallback(
     (revision: ReviewRevisionItem) => {
       if (revision.location !== 'body') {
+        setSelectedNonBodyRevisionId(revision.id);
         return;
       }
+      setSelectedNonBodyRevisionId(null);
       selectRange(revision.from, revision.to);
       scrollToPosition(revision.from);
     },
@@ -98,42 +108,15 @@ export function RevisionPanel({
   const runDecision = useCallback(
     (decision: ReviewDecision) => {
       if (!activeRevision) return;
-      if (activeRevision.location === 'body') {
-        if (
-          editorView &&
-          createRevisionDecisionTransaction(
-            editorView.state,
-            revisions,
-            activeRevision.id,
-            decision
-          )
-        ) {
-          applyRevisionDecision(editorView, revisions, activeRevision.id, decision);
-          return;
-        }
-
-        if (!pluginState?.mutateDocumentModel) return;
-        if (!canApplyBodyModelRevisionDecision(revisions, activeRevision.id)) {
-          return;
-        }
-        pluginState.mutateDocumentModel((document) =>
-          applyBodyModelRevisionDecisionToDocument(document, revisions, activeRevision.id, decision)
-        );
-        return;
-      }
-
-      if (!pluginState?.mutateDocumentModel) return;
-      if (!canApplyHeaderFooterRevisionDecision(revisions, activeRevision.id)) return;
-      pluginState.mutateDocumentModel((document) =>
-        applyHeaderFooterRevisionDecisionToDocument(
-          document,
-          revisions,
-          activeRevision.id,
-          decision
-        )
-      );
+      runRevisionDecision({
+        editorView: editorView ?? null,
+        revisions,
+        revisionId: activeRevision.id,
+        decision,
+        mutateDocumentModel,
+      });
     },
-    [editorView, activeRevision, pluginState, revisions]
+    [editorView, activeRevision, revisions, mutateDocumentModel]
   );
 
   const runBulkDecision = useCallback(
@@ -145,19 +128,19 @@ export function RevisionPanel({
         applyBulkRevisionDecision(editorView, revisions, decision);
       }
 
-      if (pluginState?.mutateDocumentModel && canApplyBulkBodyModelRevisionDecision(revisions)) {
-        pluginState.mutateDocumentModel((document) =>
+      if (mutateDocumentModel && canApplyBulkBodyModelRevisionDecision(revisions)) {
+        mutateDocumentModel((document) =>
           applyBulkBodyModelRevisionDecisionToDocument(document, revisions, decision)
         );
       }
 
-      if (pluginState?.mutateDocumentModel && canApplyBulkHeaderFooterRevisionDecision(revisions)) {
-        pluginState.mutateDocumentModel((document) =>
+      if (mutateDocumentModel && canApplyBulkHeaderFooterRevisionDecision(revisions)) {
+        mutateDocumentModel((document) =>
           applyBulkHeaderFooterRevisionDecisionToDocument(document, revisions, decision)
         );
       }
     },
-    [editorView, pluginState, revisions]
+    [editorView, mutateDocumentModel, revisions]
   );
 
   const canAcceptActive =
@@ -170,9 +153,8 @@ export function RevisionPanel({
             activeRevision.id,
             'accept'
           )) ||
-        (!!pluginState?.mutateDocumentModel &&
-          canApplyBodyModelRevisionDecision(revisions, activeRevision.id))
-      : !!pluginState?.mutateDocumentModel &&
+        (!!mutateDocumentModel && canApplyBodyModelRevisionDecision(revisions, activeRevision.id))
+      : !!mutateDocumentModel &&
         canApplyHeaderFooterRevisionDecision(revisions, activeRevision.id));
   const canRejectActive =
     !!activeRevision &&
@@ -184,20 +166,19 @@ export function RevisionPanel({
             activeRevision.id,
             'reject'
           )) ||
-        (!!pluginState?.mutateDocumentModel &&
-          canApplyBodyModelRevisionDecision(revisions, activeRevision.id))
-      : !!pluginState?.mutateDocumentModel &&
+        (!!mutateDocumentModel && canApplyBodyModelRevisionDecision(revisions, activeRevision.id))
+      : !!mutateDocumentModel &&
         canApplyHeaderFooterRevisionDecision(revisions, activeRevision.id));
   const canAcceptAll =
     (!!editorView &&
       !!createBulkRevisionDecisionTransaction(editorView.state, revisions, 'accept')) ||
-    (!!pluginState?.mutateDocumentModel && canApplyBulkBodyModelRevisionDecision(revisions)) ||
-    (!!pluginState?.mutateDocumentModel && canApplyBulkHeaderFooterRevisionDecision(revisions));
+    (!!mutateDocumentModel && canApplyBulkBodyModelRevisionDecision(revisions)) ||
+    (!!mutateDocumentModel && canApplyBulkHeaderFooterRevisionDecision(revisions));
   const canRejectAll =
     (!!editorView &&
       !!createBulkRevisionDecisionTransaction(editorView.state, revisions, 'reject')) ||
-    (!!pluginState?.mutateDocumentModel && canApplyBulkBodyModelRevisionDecision(revisions)) ||
-    (!!pluginState?.mutateDocumentModel && canApplyBulkHeaderFooterRevisionDecision(revisions));
+    (!!mutateDocumentModel && canApplyBulkBodyModelRevisionDecision(revisions)) ||
+    (!!mutateDocumentModel && canApplyBulkHeaderFooterRevisionDecision(revisions));
 
   return (
     <div className="review-panel">
