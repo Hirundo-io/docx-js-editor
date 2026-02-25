@@ -585,7 +585,7 @@ export function getCaretPosition(
             return {
               x: fragment.x + indentLeft + alignmentOffset + x,
               y: fragment.y + lineOffset + pageTopY,
-              height: line.ascent + line.descent,
+              height: line.lineHeight,
               pageIndex,
             };
           }
