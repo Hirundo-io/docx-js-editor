@@ -438,11 +438,9 @@ export function App() {
           onFontsLoaded={handleFontsLoaded}
           showToolbar={true}
           showRuler={!isMobile}
-          showVariablePanel={true}
           showZoomControl={true}
           showPageNumbers={false}
           initialZoom={autoZoom}
-          variablePanelPosition="right"
         />
       </main>
     </div>

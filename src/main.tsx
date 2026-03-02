@@ -89,7 +89,6 @@ function App() {
           directXmlSaveMode="bestEffort"
           onSaveModeEvent={handleDirectXmlSaveModeEvent}
           showToolbar={true}
-          showVariablePanel={true}
           showZoomControl={true}
           showPageNumbers={true}
           onError={(error) => console.error('Editor error:', error)}

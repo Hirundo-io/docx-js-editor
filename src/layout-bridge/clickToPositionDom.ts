@@ -54,13 +54,20 @@ export function clickToPositionDom(
     }
   }
 
-  // Check for paragraph elements directly (handles table cells where the
-  // narrow empty-run span isn't hit but the parent paragraph div is)
+  // Check for paragraph elements directly (handles clicks in whitespace
+  // to the right of text, or table cells where the narrow empty-run span
+  // isn't hit but the parent paragraph div is)
   const paragraphEl = elements.find(
     (el) =>
       el.classList.contains('layout-paragraph') && (el as HTMLElement).dataset.pmStart !== undefined
   ) as HTMLElement | null;
   if (paragraphEl && paragraphEl.dataset.pmStart) {
+    // Try to find the nearest span within this paragraph so clicks to the
+    // right of text land at the end of the line, not the paragraph start.
+    const nearestPos = findNearestSpanInElement(paragraphEl, clientX, clientY);
+    if (nearestPos !== null) {
+      return nearestPos;
+    }
     return Number(paragraphEl.dataset.pmStart);
   }
 

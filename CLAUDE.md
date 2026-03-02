@@ -21,7 +21,10 @@ bun run typecheck && npx playwright test --grep "<pattern>" --timeout=30000 --wo
 # Single test file
 bun run typecheck && npx playwright test tests/formatting.spec.ts --timeout=30000
 
-# Full suite (only for final validation)
+# Only affected test files (use this after targeted changes)
+bun run typecheck && npx playwright test tests/formatting.spec.ts tests/demo-docx.spec.ts --timeout=30000 --workers=4
+
+# Full suite (only for final validation — NEVER run casually, 500+ tests)
 bun run typecheck && npx playwright test --timeout=60000 --workers=4
 ```
 
@@ -214,6 +217,17 @@ gh issue view <N> --repo eigenpal/docx-js-editor
 6. **Verify** — `bun run typecheck` + targeted Playwright tests + visual check
 7. **Commit** — reference issue number: `fix: ... (fixes #N)`
 8. **PR** — `gh pr create` referencing issue, include screenshots for visual bugs
+
+---
+
+## Pre-PR Self-Review
+
+Before opening any PR, self-review the diff against **DRY, KISS, YAGNI**:
+
+1. **DRY** — Is the same logic/style repeated across files? Extract shared code.
+2. **KISS** — Is the solution more complex than needed? Simpler alternatives?
+3. **YAGNI** — Did you add anything not required by the task? Remove it.
+4. **Formatting** — Run `bun run format` to ensure Prettier compliance before pushing.
 
 ---
 

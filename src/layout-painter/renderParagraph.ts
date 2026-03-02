@@ -10,6 +10,8 @@ import type {
   ParagraphMeasure,
   ParagraphFragment,
   ParagraphIndent,
+  ParagraphBorders,
+  BorderStyle,
   MeasuredLine,
   Run,
   TextRun,
@@ -25,6 +27,7 @@ import {
   type TabContext,
   type TabStop as TabCalcStop,
 } from '../prosemirror/utils/tabCalculator';
+import { resolveFontFamily } from '../utils/fontResolver';
 
 /**
  * CSS class names for paragraph rendering
@@ -70,6 +73,10 @@ export interface RenderParagraphOptions {
   floatingImageInfo?: FloatingImageInfo[];
   /** Fragment's Y position relative to content area (for per-line margin calculation) */
   fragmentContentY?: number;
+  /** Borders from the previous adjacent paragraph (for border grouping) */
+  prevBorders?: ParagraphBorders;
+  /** Borders from the next adjacent paragraph (for border grouping) */
+  nextBorders?: ParagraphBorders;
 }
 
 /**
@@ -110,20 +117,12 @@ function isFieldRun(run: Run): run is FieldRun {
 /**
  * Apply text run styles to an element
  */
-/**
- * Font fallback chain - MUST match measureContainer.ts to ensure
- * measurement and rendering use the same fonts
- */
-const FONT_FALLBACK = '"Segoe UI", Arial, sans-serif';
-
 function applyRunStyles(element: HTMLElement, run: TextRun | TabRun): void {
   // Font properties
   if (run.fontFamily) {
-    // Quote font names with spaces for proper CSS
-    // Use the same fallback chain as measureContainer.ts to ensure
-    // text renders with the same widths as measured
-    const fontName = run.fontFamily.includes(' ') ? `"${run.fontFamily}"` : run.fontFamily;
-    element.style.fontFamily = `${fontName}, ${FONT_FALLBACK}`;
+    // Use the font resolver for category-appropriate fallback stacks,
+    // matching the same stacks used in measureContainer.ts
+    element.style.fontFamily = resolveFontFamily(run.fontFamily).cssFallback;
   }
   if (run.fontSize) {
     // fontSize is in points - convert to pixels to match Canvas measurement
@@ -562,11 +561,12 @@ function createTextMeasurer(
 
   return (text: string, fontSize = 11, fontFamily = 'Calibri') => {
     if (!ctx) return text.length * 7; // Fallback estimate
-    // Use same fallback chain as measureContainer.ts to ensure consistent measurements
-    const fontName = fontFamily.includes(' ') ? `"${fontFamily}"` : fontFamily;
+    // Use font resolver for category-appropriate fallback stacks,
+    // matching measureContainer.ts
+    const cssFallback = resolveFontFamily(fontFamily).cssFallback;
     // Convert pt to px for canvas (1pt = 96/72 px)
     const fontSizePx = (fontSize * 96) / 72;
-    ctx.font = `${fontSizePx}px ${fontName}, ${FONT_FALLBACK}`;
+    ctx.font = `${fontSizePx}px ${cssFallback}`;
     return ctx.measureText(text).width;
   };
 }
@@ -749,6 +749,31 @@ export function renderLine(
 }
 
 /**
+ * Check if two individual border definitions are equal (same style, width, color).
+ */
+function bordersEqual(a?: BorderStyle, b?: BorderStyle): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return a.style === b.style && a.width === b.width && a.color === b.color;
+}
+
+/**
+ * Check if two ParagraphBorders form a group (ECMA-376 §17.3.1.24).
+ * Adjacent paragraphs with identical border definitions belong to the same group.
+ */
+function bordersFormGroup(a?: ParagraphBorders, b?: ParagraphBorders): boolean {
+  if (!a && !b) return false; // no borders = no group
+  if (!a || !b) return false;
+  return (
+    bordersEqual(a.top, b.top) &&
+    bordersEqual(a.bottom, b.bottom) &&
+    bordersEqual(a.left, b.left) &&
+    bordersEqual(a.right, b.right) &&
+    bordersEqual(a.between, b.between)
+  );
+}
+
+/**
  * Render a paragraph fragment
  *
  * @param fragment - The fragment to render
@@ -878,27 +903,42 @@ export function renderParagraphFragment(
     // Ensure box-sizing is set for proper border calculations
     fragmentEl.style.boxSizing = 'border-box';
 
-    if (borders.top) {
-      fragmentEl.style.borderTop = `${borders.top.width}px ${borderStyleToCss(borders.top.style)} ${borders.top.color}`;
+    const borderToCss = (b: BorderStyle) => `${b.width}px ${borderStyleToCss(b.style)} ${b.color}`;
+
+    // Word-style border grouping (ECMA-376 §17.3.1.24):
+    // Adjacent paragraphs with identical pBdr form a group.
+    // - top border → only on the first paragraph of the group
+    // - bottom border → only on the last paragraph of the group
+    // - between border → rendered as borderTop on interior paragraphs
+    // - left/right → on every paragraph in the group
+    const groupedWithPrev = bordersFormGroup(options.prevBorders, borders);
+    const groupedWithNext = bordersFormGroup(borders, options.nextBorders);
+
+    if (groupedWithPrev && borders.between) {
+      fragmentEl.style.borderTop = borderToCss(borders.between);
+    } else if (borders.top && !groupedWithPrev) {
+      fragmentEl.style.borderTop = borderToCss(borders.top);
     }
-    if (borders.bottom) {
-      fragmentEl.style.borderBottom = `${borders.bottom.width}px ${borderStyleToCss(borders.bottom.style)} ${borders.bottom.color}`;
+
+    if (borders.bottom && !groupedWithNext) {
+      fragmentEl.style.borderBottom = borderToCss(borders.bottom);
     }
     if (borders.left) {
-      fragmentEl.style.borderLeft = `${borders.left.width}px ${borderStyleToCss(borders.left.style)} ${borders.left.color}`;
+      fragmentEl.style.borderLeft = borderToCss(borders.left);
     }
     if (borders.right) {
-      fragmentEl.style.borderRight = `${borders.right.width}px ${borderStyleToCss(borders.right.style)} ${borders.right.color}`;
+      fragmentEl.style.borderRight = borderToCss(borders.right);
     }
 
     // Add small padding inside borders for text not to touch the border
     // This is standard Word behavior
     // Bottom padding needs to be larger to clear text descenders
-    const hasBorder = borders.top || borders.bottom || borders.left || borders.right;
+    const hasBorder =
+      borders.top || borders.bottom || borders.left || borders.right || borders.between;
     if (hasBorder) {
       fragmentEl.style.paddingLeft = borders.left ? '4px' : '0';
       fragmentEl.style.paddingRight = borders.right ? '4px' : '0';
-      fragmentEl.style.paddingTop = borders.top ? '2px' : '0';
+      fragmentEl.style.paddingTop = borders.top || borders.between ? '2px' : '0';
       // Use larger bottom padding to ensure border is below text descenders
       fragmentEl.style.paddingBottom = borders.bottom ? '6px' : '0';
     }

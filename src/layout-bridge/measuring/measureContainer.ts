@@ -11,6 +11,8 @@
  *   falling back to fontSize * 1.15 (Word 2007+ "single" line spacing)
  */
 
+import { resolveFontFamily } from '../../utils/fontResolver';
+
 // Constants for OOXML unit conversions
 const TWIPS_PER_INCH = 1440;
 const PX_PER_INCH = 96; // Standard CSS/DOM DPI
@@ -43,6 +45,8 @@ export interface FontMetrics {
   descent: number;
   lineHeight: number;
   fontFamily: string;
+  /** OS/2 single-line ratio for OOXML line spacing calculation */
+  singleLineRatio: number;
 }
 
 /**
@@ -95,11 +99,34 @@ export function resetCanvasContext(): void {
   canvasContext = null;
 }
 
+/** Cached resolved font data (CSS fallback + single-line ratio) */
+interface ResolvedFontCache {
+  cssFallback: string;
+  singleLineRatio: number;
+}
+
+/** Cache for resolved font data */
+const fontResolvedCache = new Map<string, ResolvedFontCache>();
+
 /**
- * Default font fallback chain - must match what renderPage.ts uses
- * This ensures Canvas measurement matches actual DOM rendering.
+ * Get the resolved font data for a font family, with caching.
  */
-const FONT_FALLBACK = '"Segoe UI", Arial, sans-serif';
+function getResolvedData(fontFamily: string): ResolvedFontCache {
+  let cached = fontResolvedCache.get(fontFamily);
+  if (cached === undefined) {
+    const resolved = resolveFontFamily(fontFamily);
+    cached = { cssFallback: resolved.cssFallback, singleLineRatio: resolved.singleLineRatio };
+    fontResolvedCache.set(fontFamily, cached);
+  }
+  return cached;
+}
+
+/**
+ * Get the CSS fallback string for a font family, with caching.
+ */
+function getResolvedFallback(fontFamily: string): string {
+  return getResolvedData(fontFamily).cssFallback;
+}
 
 /**
  * Build a CSS font string from styling properties
@@ -107,12 +134,13 @@ const FONT_FALLBACK = '"Segoe UI", Arial, sans-serif';
  * Font sizes are in points and need to be converted to pixels for canvas.
  * 1pt = 96/72 px ≈ 1.333px at standard web DPI.
  *
- * IMPORTANT: Uses the same font fallback chain as renderPage.ts to ensure
- * Canvas measurements match actual DOM rendering widths.
+ * Uses the font resolver to get category-appropriate fallback stacks
+ * (serif fonts get serif fallbacks, sans-serif get sans-serif, etc.)
+ * matching the same stacks used in rendering for consistent measurements.
  *
  * @example
  * buildFontString({ fontFamily: "Arial", fontSize: 12, bold: true })
- * // Returns: "bold 16px Arial, "Segoe UI", Arial, sans-serif" (12pt = 16px)
+ * // Returns: "bold 16px Arial, Arimo, Helvetica, sans-serif" (12pt = 16px)
  */
 export function buildFontString(style: FontStyle): string {
   const parts: string[] = [];
@@ -125,11 +153,9 @@ export function buildFontString(style: FontStyle): string {
   const fontSizePx = ptToPx(fontSizePt);
   parts.push(`${fontSizePx}px`);
 
-  // Use the same font fallback chain as the renderer to ensure
-  // measurements match actual rendering
+  // Use the font resolver for category-appropriate fallback stacks
   const fontFamily = style.fontFamily ?? DEFAULT_FONT_FAMILY;
-  const fontName = fontFamily.includes(' ') ? `"${fontFamily}"` : fontFamily;
-  parts.push(`${fontName}, ${FONT_FALLBACK}`);
+  parts.push(getResolvedFallback(fontFamily));
 
   return parts.join(' ');
 }
@@ -168,15 +194,12 @@ export function getFontMetrics(style: FontStyle): FontMetrics {
       descent = metrics.actualBoundingBoxDescent;
     }
 
-    // Use font design metrics (OS/2 table) for line height when available.
-    // fontBoundingBox represents the font's design metrics, giving per-font
-    // natural line heights that match Word's behavior.
-    if (
-      typeof metrics.fontBoundingBoxAscent === 'number' &&
-      typeof metrics.fontBoundingBoxDescent === 'number'
-    ) {
-      lineHeight = metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent;
-    }
+    // Note: We intentionally do NOT use fontBoundingBoxAscent/Descent for lineHeight.
+    // When Google Font substitutes are used (e.g., EB Garamond for Garamond),
+    // their fontBoundingBox metrics are significantly larger than the original font's
+    // OS/2 metrics that Word uses (e.g., EB Garamond 12pt: 21px vs Garamond: 18px).
+    // Using fontSize * 1.15 as the base provides a better approximation of Word's
+    // single-line spacing across all fonts, including substitutes.
   } catch {
     // Use fallback ratio-based values
   }
@@ -184,12 +207,16 @@ export function getFontMetrics(style: FontStyle): FontMetrics {
   // Ensure line height is never smaller than actual glyph bounds
   lineHeight = Math.max(lineHeight, ascent + descent);
 
+  // Look up OS/2 single-line ratio for OOXML line spacing
+  const singleLineRatio = getResolvedData(fontFamily).singleLineRatio;
+
   return {
     fontSize, // Keep in points for reference
     ascent,
     descent,
     lineHeight,
     fontFamily,
+    singleLineRatio,
   };
 }
 

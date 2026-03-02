@@ -1,6 +1,6 @@
 {
   "name": "@eigenpal/docx-js-editor",
-  "version": "0.0.13",
+  "version": "0.0.16",
   "description": "A browser-based DOCX template editor with variable insertion support",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -100,45 +100,13 @@
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0",
-    "prosemirror-commands": "^1.5.2",
-    "prosemirror-dropcursor": "^1.8.2",
-    "prosemirror-history": "^1.4.0",
-    "prosemirror-keymap": "^1.2.2",
-    "prosemirror-model": "^1.19.4",
-    "prosemirror-state": "^1.4.3",
-    "prosemirror-tables": "^1.8.5",
-    "prosemirror-view": "^1.32.7"
+    "react-dom": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
     "react": {
       "optional": true
     },
     "react-dom": {
-      "optional": true
-    },
-    "prosemirror-commands": {
-      "optional": true
-    },
-    "prosemirror-dropcursor": {
-      "optional": true
-    },
-    "prosemirror-history": {
-      "optional": true
-    },
-    "prosemirror-keymap": {
-      "optional": true
-    },
-    "prosemirror-model": {
-      "optional": true
-    },
-    "prosemirror-state": {
-      "optional": true
-    },
-    "prosemirror-tables": {
-      "optional": true
-    },
-    "prosemirror-view": {
       "optional": true
     }
   },
@@ -148,6 +116,14 @@
     "docxtemplater": "^3.50.0",
     "jszip": "^3.10.1",
     "pizzip": "^3.1.7",
+    "prosemirror-commands": "^1.5.2",
+    "prosemirror-dropcursor": "^1.8.2",
+    "prosemirror-history": "^1.4.0",
+    "prosemirror-keymap": "^1.2.2",
+    "prosemirror-model": "^1.19.4",
+    "prosemirror-state": "^1.4.3",
+    "prosemirror-tables": "^1.8.5",
+    "prosemirror-view": "^1.32.7",
     "xml-js": "^1.6.11"
   },
   "devDependencies": {
@@ -170,14 +146,6 @@
     "lint-staged": "^16.2.7",
     "postcss": "^8.4.33",
     "prettier": "^3.8.1",
-    "prosemirror-commands": "^1.5.2",
-    "prosemirror-dropcursor": "^1.8.2",
-    "prosemirror-history": "^1.4.0",
-    "prosemirror-keymap": "^1.2.2",
-    "prosemirror-model": "^1.19.4",
-    "prosemirror-state": "^1.4.3",
-    "prosemirror-tables": "^1.8.5",
-    "prosemirror-view": "^1.32.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "size-limit": "^12.0.0",
